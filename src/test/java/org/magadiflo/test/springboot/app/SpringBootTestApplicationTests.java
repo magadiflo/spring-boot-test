@@ -12,6 +12,8 @@ import org.magadiflo.test.springboot.app.repositories.IBancoRepository;
 import org.magadiflo.test.springboot.app.repositories.ICuentaRepository;
 import org.magadiflo.test.springboot.app.services.ICuentaService;
 import org.magadiflo.test.springboot.app.services.impl.CuentaServiceImpl;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -20,15 +22,18 @@ import java.math.BigDecimal;
 @SpringBootTest
 class SpringBootTestApplicationTests {
 
+    @Mock
     ICuentaRepository cuentaRepository;
+    @Mock
     IBancoRepository bancoRepository;
-    ICuentaService cuentaService;
+    @InjectMocks
+    CuentaServiceImpl cuentaService; //Es necesario que sea la implementación concreta, ya que este tiene un constructor
 
     @BeforeEach
     void setUp() {
-        this.cuentaRepository = Mockito.mock(ICuentaRepository.class);
-        this.bancoRepository = Mockito.mock(IBancoRepository.class);
-        this.cuentaService = new CuentaServiceImpl(cuentaRepository, bancoRepository);
+//        this.cuentaRepository = Mockito.mock(ICuentaRepository.class);
+//        this.bancoRepository = Mockito.mock(IBancoRepository.class);
+//        this.cuentaService = new CuentaServiceImpl(cuentaRepository, bancoRepository);
     }
 
     @Test
