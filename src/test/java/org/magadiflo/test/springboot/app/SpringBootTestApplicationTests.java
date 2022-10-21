@@ -11,23 +11,22 @@ import org.magadiflo.test.springboot.app.models.Cuenta;
 import org.magadiflo.test.springboot.app.repositories.IBancoRepository;
 import org.magadiflo.test.springboot.app.repositories.ICuentaRepository;
 import org.magadiflo.test.springboot.app.services.ICuentaService;
-import org.magadiflo.test.springboot.app.services.impl.CuentaServiceImpl;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.math.BigDecimal;
 
 @SpringBootTest
 class SpringBootTestApplicationTests {
 
-    @Mock
+    @MockBean
     ICuentaRepository cuentaRepository;
-    @Mock
+    @MockBean
     IBancoRepository bancoRepository;
-    @InjectMocks
-    CuentaServiceImpl cuentaService; //Es necesario que sea la implementación concreta, ya que este tiene un constructor
+    @Autowired
+    ICuentaService cuentaService;
 
     @BeforeEach
     void setUp() {

@@ -5,9 +5,11 @@ import org.magadiflo.test.springboot.app.models.Cuenta;
 import org.magadiflo.test.springboot.app.repositories.IBancoRepository;
 import org.magadiflo.test.springboot.app.repositories.ICuentaRepository;
 import org.magadiflo.test.springboot.app.services.ICuentaService;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 
+@Service
 public class CuentaServiceImpl implements ICuentaService {
 
     private final ICuentaRepository cuentaRepository;
