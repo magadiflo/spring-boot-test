@@ -63,6 +63,9 @@ class SpringBootTestApplicationTests {
 
         Mockito.verify(this.bancoRepository, Mockito.times(2)).findById(1L);
         Mockito.verify(this.bancoRepository).update(Mockito.any(Banco.class));
+
+        Mockito.verify(this.cuentaRepository, Mockito.times(6)).findById(Mockito.anyLong());
+        Mockito.verify(this.cuentaRepository, Mockito.never()).findAll();
     }
 
     @Test
@@ -98,6 +101,22 @@ class SpringBootTestApplicationTests {
 
         Mockito.verify(this.bancoRepository, Mockito.times(1)).findById(1L);
         Mockito.verify(this.bancoRepository, Mockito.never()).update(Mockito.any(Banco.class));
+
+        Mockito.verify(this.cuentaRepository, Mockito.times(6)).findById(Mockito.anyLong());
+        Mockito.verify(this.cuentaRepository, Mockito.never()).findAll();
     }
 
+    @Test
+    void contextLoad3() {
+        Mockito.when(this.cuentaRepository.findById(1L)).thenReturn(Datos.cuenta001());
+
+        Cuenta cuenta1 = this.cuentaService.findById(1L);
+        Cuenta cuenta2 = this.cuentaService.findById(1L);
+
+        assertSame(cuenta1, cuenta2);
+        assertEquals("Martín", cuenta1.getPersona());
+        assertEquals("Martín", cuenta2.getPersona());
+
+        Mockito.verify(this.cuentaRepository, Mockito.times(2)).findById(1L);
+    }
 }
