@@ -22,6 +22,7 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
+<!--		En esta dependencia se incluye JUnit 5 y Mockito-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
