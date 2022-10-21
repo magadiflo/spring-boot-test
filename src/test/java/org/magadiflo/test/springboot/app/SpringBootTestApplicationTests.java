@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.magadiflo.test.springboot.app.data.Datos;
+import org.magadiflo.test.springboot.app.exceptions.DineroInsuficienteException;
 import org.magadiflo.test.springboot.app.models.Banco;
 import org.magadiflo.test.springboot.app.models.Cuenta;
 import org.magadiflo.test.springboot.app.repositories.IBancoRepository;
@@ -32,9 +33,9 @@ class SpringBootTestApplicationTests {
 
     @Test
     void contextLoads() {
-        Mockito.when(this.cuentaRepository.findById(1L)).thenReturn(Datos.CUENTA_001);
-        Mockito.when(this.cuentaRepository.findById(2L)).thenReturn(Datos.CUENTA_002);
-        Mockito.when(this.bancoRepository.findById(1L)).thenReturn(Datos.BANCO);
+        Mockito.when(this.cuentaRepository.findById(1L)).thenReturn(Datos.cuenta001());
+        Mockito.when(this.cuentaRepository.findById(2L)).thenReturn(Datos.cuenta002());
+        Mockito.when(this.bancoRepository.findById(1L)).thenReturn(Datos.banco());
 
         BigDecimal saldoOrigen = this.cuentaService.revisarSaldo(1L);
         BigDecimal saldoDestino = this.cuentaService.revisarSaldo(2L);
@@ -62,6 +63,41 @@ class SpringBootTestApplicationTests {
 
         Mockito.verify(this.bancoRepository, Mockito.times(2)).findById(1L);
         Mockito.verify(this.bancoRepository).update(Mockito.any(Banco.class));
+    }
+
+    @Test
+    void contextLoads2() {
+        Mockito.when(this.cuentaRepository.findById(1L)).thenReturn(Datos.cuenta001());
+        Mockito.when(this.cuentaRepository.findById(2L)).thenReturn(Datos.cuenta002());
+        Mockito.when(this.bancoRepository.findById(1L)).thenReturn(Datos.banco());
+
+        BigDecimal saldoOrigen = this.cuentaService.revisarSaldo(1L);
+        BigDecimal saldoDestino = this.cuentaService.revisarSaldo(2L);
+
+        assertEquals("1000", saldoOrigen.toPlainString());
+        assertEquals("2000", saldoDestino.toPlainString());
+
+        assertThrows(DineroInsuficienteException.class, () -> {
+            this.cuentaService.transferir(1L, 2L, new BigDecimal("1200"), 1L);
+        });
+
+        saldoOrigen = this.cuentaService.revisarSaldo(1L);
+        saldoDestino = this.cuentaService.revisarSaldo(2L);
+
+        assertEquals("1000", saldoOrigen.toPlainString());
+        assertEquals("2000", saldoDestino.toPlainString());
+
+        int total = this.cuentaService.revisarTotalTransferencias(1L);
+
+        assertEquals(0, total);
+
+        //Verificamos el número de veces que se llaman los métodos de cada repository
+        Mockito.verify(this.cuentaRepository, Mockito.times(3)).findById(1L);
+        Mockito.verify(this.cuentaRepository, Mockito.times(3)).findById(2L);
+        Mockito.verify(this.cuentaRepository, Mockito.never()).update(Mockito.any(Cuenta.class));
+
+        Mockito.verify(this.bancoRepository, Mockito.times(1)).findById(1L);
+        Mockito.verify(this.bancoRepository, Mockito.never()).update(Mockito.any(Banco.class));
     }
 
 }
