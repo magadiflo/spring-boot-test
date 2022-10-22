@@ -63,10 +63,10 @@ class SpringBootTestApplicationTests {
         Mockito.verify(this.cuentaRepository, Mockito.times(3)).findById(1L);
         Mockito.verify(this.cuentaRepository, Mockito.times(3)).findById(2L);
         Mockito.verify(this.cuentaRepository, Mockito.times(2))
-                .update(Mockito.any(Cuenta.class));
+                .save(Mockito.any(Cuenta.class));
 
         Mockito.verify(this.bancoRepository, Mockito.times(2)).findById(1L);
-        Mockito.verify(this.bancoRepository).update(Mockito.any(Banco.class));
+        Mockito.verify(this.bancoRepository).save(Mockito.any(Banco.class));
 
         Mockito.verify(this.cuentaRepository, Mockito.times(6)).findById(Mockito.anyLong());
         Mockito.verify(this.cuentaRepository, Mockito.never()).findAll();
@@ -101,10 +101,10 @@ class SpringBootTestApplicationTests {
         //Verificamos el número de veces que se llaman los métodos de cada repository
         Mockito.verify(this.cuentaRepository, Mockito.times(3)).findById(1L);
         Mockito.verify(this.cuentaRepository, Mockito.times(3)).findById(2L);
-        Mockito.verify(this.cuentaRepository, Mockito.never()).update(Mockito.any(Cuenta.class));
+        Mockito.verify(this.cuentaRepository, Mockito.never()).save(Mockito.any(Cuenta.class));
 
         Mockito.verify(this.bancoRepository, Mockito.times(1)).findById(1L);
-        Mockito.verify(this.bancoRepository, Mockito.never()).update(Mockito.any(Banco.class));
+        Mockito.verify(this.bancoRepository, Mockito.never()).save(Mockito.any(Banco.class));
 
         Mockito.verify(this.cuentaRepository, Mockito.times(6)).findById(Mockito.anyLong());
         Mockito.verify(this.cuentaRepository, Mockito.never()).findAll();
