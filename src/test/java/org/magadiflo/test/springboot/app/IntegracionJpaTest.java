@@ -69,4 +69,41 @@ public class IntegracionJpaTest {
         assertEquals("3000", cuenta.getSaldo().toPlainString());
         //assertEquals(3, cuenta.getId()); no es recomendable usar el id ya que podría cambiar
     }
+
+    @Test
+    void testUpdate() {
+        // Given
+        Cuenta cuentaPepe = new Cuenta(null, "Pepe", new BigDecimal("3000"));
+
+        // When (saving)
+        Cuenta cuenta = this.cuentaRepository.save(cuentaPepe);
+
+        // Then
+        assertEquals("Pepe", cuenta.getPersona());
+        assertEquals("3000", cuenta.getSaldo().toPlainString());
+
+        // When (Updating)
+        cuenta.setSaldo(new BigDecimal("3800"));
+        Cuenta cuentaActualizada = this.cuentaRepository.save(cuenta);
+
+        // Then
+        assertEquals("Pepe", cuentaActualizada.getPersona());
+        assertEquals("3800", cuentaActualizada.getSaldo().toPlainString());
+    }
+
+    @Test
+    void testDelete() {
+        // Given
+        Cuenta cuenta = this.cuentaRepository.findById(1L).orElseThrow();
+        assertEquals("Martín", cuenta.getPersona());
+
+        // When
+        this.cuentaRepository.delete(cuenta);
+
+        assertThrows(NoSuchElementException.class, () -> {
+            this.cuentaRepository.findById(1L).orElseThrow();
+        });
+
+        assertEquals(1, this.cuentaRepository.findAll().size());
+    }
 }
