@@ -27,7 +27,7 @@ public class CuentaServiceImpl implements ICuentaService {
 
     @Override
     public int revisarTotalTransferencias(Long bancoId) {
-        Banco banco = this.bancoRepository.findById(bancoId);
+        Banco banco = this.bancoRepository.findById(bancoId).orElseThrow();
         return banco.getTotalTransferencia();
     }
 
@@ -48,9 +48,9 @@ public class CuentaServiceImpl implements ICuentaService {
         this.cuentaRepository.save(cOrigen);
         this.cuentaRepository.save(cDestino);
 
-        Banco banco = this.bancoRepository.findById(bancoId);
+        Banco banco = this.bancoRepository.findById(bancoId).orElseThrow();
         int totalTransferencias = banco.getTotalTransferencia();
         banco.setTotalTransferencia(++totalTransferencias);
-        this.bancoRepository.update(banco);
+        this.bancoRepository.save(banco);
     }
 }
