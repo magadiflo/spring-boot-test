@@ -37,7 +37,7 @@ public class CuentaServiceImpl implements ICuentaService {
     @Override
     @Transactional
     public Cuenta save(Cuenta cuenta) {
-        return null;
+        return this.cuentaRepository.save(cuenta);
     }
 
     @Override

@@ -142,4 +142,25 @@ class SpringBootTestApplicationTests {
 
         Mockito.verify(this.cuentaRepository).findAll();
     }
+
+    @Test
+    void testSave() {
+        // GIVEN
+        Cuenta cuentaPepe = new Cuenta(null, "Pepe", new BigDecimal("3000"));
+        Mockito.when(this.cuentaRepository.save(Mockito.any())).then(invocation -> {
+            Cuenta c = invocation.getArgument(0);
+            c.setId(3L);
+            return c;
+        });
+
+        // WHEN
+        Cuenta cuenta = this.cuentaService.save(cuentaPepe);
+
+        // THEN
+        assertEquals("Pepe", cuenta.getPersona());
+        assertEquals(3, cuenta.getId());
+        assertEquals("3000", cuenta.getSaldo().toPlainString());
+
+        Mockito.verify(this.cuentaRepository).save(Mockito.any());
+    }
 }
