@@ -1,5 +1,6 @@
 package org.magadiflo.test.springboot.app.controllers;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -109,5 +110,31 @@ class CuentaControllerTest {
                 .andExpect(MockMvcResultMatchers.jsonPath("$[1].saldo").value("2000"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$", Matchers.hasSize(2)))
                 .andExpect(MockMvcResultMatchers.content().json(this.objectMapper.writeValueAsString(cuentas)));
+
+        Mockito.verify(this.cuentaService).findAll();
+    }
+
+    @Test
+    void testGuardar() throws Exception {
+        // GIVEN
+        Cuenta cuenta = new Cuenta(null, "Tinkler", new BigDecimal("3000"));
+        Mockito.when(this.cuentaService.save(Mockito.any())).then(invocation -> {
+            Cuenta c = invocation.getArgument(0);
+            c.setId(3L);
+            return c;
+        });
+
+        // WHEN
+        this.mockMvc.perform(MockMvcRequestBuilders.post("/api/cuentas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(this.objectMapper.writeValueAsString(cuenta)))
+                // THEN
+                .andExpect(MockMvcResultMatchers.status().isCreated())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id", Matchers.is(3)))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.persona", Matchers.is("Tinkler")))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.saldo", Matchers.is(3000)));
+
+        Mockito.verify(this.cuentaService).save(Mockito.any());
     }
 }
