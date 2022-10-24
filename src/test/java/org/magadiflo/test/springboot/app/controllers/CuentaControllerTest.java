@@ -1,9 +1,11 @@
 package org.magadiflo.test.springboot.app.controllers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.magadiflo.test.springboot.app.data.Datos;
+import org.magadiflo.test.springboot.app.models.Cuenta;
 import org.magadiflo.test.springboot.app.models.dto.TransaccionDTO;
 import org.magadiflo.test.springboot.app.services.impl.CuentaServiceImpl;
 import org.mockito.Mockito;
@@ -18,8 +20,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 @WebMvcTest(CuentaController.class) //Testearemos el controller CuentaController
 class CuentaControllerTest {
@@ -89,5 +90,24 @@ class CuentaControllerTest {
                 .andExpect(MockMvcResultMatchers.jsonPath("$.mensaje").value("Transferencia realizada con éxito"))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.transaccion.cuentaOrigenId").value(dto.getCuentaOrigenId()))
                 .andExpect(MockMvcResultMatchers.content().json(this.objectMapper.writeValueAsString(response)));
+    }
+
+    @Test
+    void testListar() throws Exception {
+        // GIVEN
+        List<Cuenta> cuentas = Arrays.asList(Datos.cuenta001().orElseThrow(), Datos.cuenta002().orElseThrow());
+        Mockito.when(this.cuentaService.findAll()).thenReturn(cuentas);
+
+        // WHEN
+        this.mockMvc.perform(MockMvcRequestBuilders.get("/api/cuentas").contentType(MediaType.APPLICATION_JSON))
+                // THEN
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].persona").value("Martín"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[1].persona").value("Gaspar"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].saldo").value("1000"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[1].saldo").value("2000"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$", Matchers.hasSize(2)))
+                .andExpect(MockMvcResultMatchers.content().json(this.objectMapper.writeValueAsString(cuentas)));
     }
 }
