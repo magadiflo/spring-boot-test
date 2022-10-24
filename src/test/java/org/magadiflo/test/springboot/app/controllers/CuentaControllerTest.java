@@ -10,6 +10,7 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -17,6 +18,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
 
 @WebMvcTest(CuentaController.class) //Testearemos el controller CuentaController
 class CuentaControllerTest {
@@ -64,6 +67,17 @@ class CuentaControllerTest {
         dto.setMonto(new BigDecimal("100"));
         dto.setBancoId(1L);
 
+        System.out.println(this.objectMapper.writeValueAsString(dto));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("date", LocalDate.now().toString());
+        response.put("status", HttpStatus.OK);
+        response.put("code", HttpStatus.OK.value());
+        response.put("mensaje", "Transferencia realizada con éxito");
+        response.put("transaccion", dto);
+
+        System.out.println(this.objectMapper.writeValueAsString(response));
+
         // WHEN
         this.mockMvc.perform(MockMvcRequestBuilders.post("/api/cuentas/transferir")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -73,6 +87,7 @@ class CuentaControllerTest {
                 .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.date").value(LocalDate.now().toString()))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.mensaje").value("Transferencia realizada con éxito"))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.transaccion.cuentaOrigenId").value(dto.getCuentaOrigenId()));
+                .andExpect(MockMvcResultMatchers.jsonPath("$.transaccion.cuentaOrigenId").value(dto.getCuentaOrigenId()))
+                .andExpect(MockMvcResultMatchers.content().json(this.objectMapper.writeValueAsString(response)));
     }
 }
