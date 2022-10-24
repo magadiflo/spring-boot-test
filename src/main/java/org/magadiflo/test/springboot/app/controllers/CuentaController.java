@@ -5,14 +5,13 @@ import org.magadiflo.test.springboot.app.models.dto.TransaccionDTO;
 import org.magadiflo.test.springboot.app.services.ICuentaService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
-@Controller
+@RestController
 @RequestMapping(path = "/api/cuentas")
 public class CuentaController {
 
