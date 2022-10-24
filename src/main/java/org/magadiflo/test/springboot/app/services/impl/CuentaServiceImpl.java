@@ -6,6 +6,7 @@ import org.magadiflo.test.springboot.app.repositories.IBancoRepository;
 import org.magadiflo.test.springboot.app.repositories.ICuentaRepository;
 import org.magadiflo.test.springboot.app.services.ICuentaService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
@@ -21,23 +22,27 @@ public class CuentaServiceImpl implements ICuentaService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Cuenta findById(Long id) {
         return this.cuentaRepository.findById(id).orElseThrow();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int revisarTotalTransferencias(Long bancoId) {
         Banco banco = this.bancoRepository.findById(bancoId).orElseThrow();
         return banco.getTotalTransferencia();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public BigDecimal revisarSaldo(Long cuentaId) {
         Cuenta cuenta = this.cuentaRepository.findById(cuentaId).orElseThrow();
         return cuenta.getSaldo();
     }
 
     @Override
+    @Transactional
     public void transferir(Long cuentaOrigenId, Long cuentaDestinoId, BigDecimal monto, Long bancoId) {
         Cuenta cOrigen = this.cuentaRepository.findById(cuentaOrigenId).orElseThrow();
         Cuenta cDestino = this.cuentaRepository.findById(cuentaDestinoId).orElseThrow();
