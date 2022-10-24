@@ -25,7 +25,7 @@ public class CuentaServiceImpl implements ICuentaService {
     @Override
     @Transactional(readOnly = true)
     public List<Cuenta> findAll() {
-        return null;
+        return this.cuentaRepository.findAll();
     }
 
     @Override
