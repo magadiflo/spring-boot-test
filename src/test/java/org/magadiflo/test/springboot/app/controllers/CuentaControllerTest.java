@@ -1,7 +1,10 @@
 package org.magadiflo.test.springboot.app.controllers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.magadiflo.test.springboot.app.data.Datos;
+import org.magadiflo.test.springboot.app.models.dto.TransaccionDTO;
 import org.magadiflo.test.springboot.app.services.impl.CuentaServiceImpl;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +15,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 @WebMvcTest(CuentaController.class) //Testearemos el controller CuentaController
 class CuentaControllerTest {
 
@@ -20,6 +26,13 @@ class CuentaControllerTest {
 
     @MockBean
     private CuentaServiceImpl cuentaService;
+
+    ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setUp() {
+        this.objectMapper = new ObjectMapper();
+    }
 
     @Test
     void testDetalle() throws Exception {
@@ -40,5 +53,26 @@ class CuentaControllerTest {
 
         //Verificar que efectivamente el método this.cuentaService.findById(...) sea llamado
         Mockito.verify(this.cuentaService).findById(1L);
+    }
+
+    @Test
+    void testTransferir() throws Exception {
+        // GIVEN
+        TransaccionDTO dto = new TransaccionDTO();
+        dto.setCuentaOrigenId(1L);
+        dto.setCuentaDestinoId(2L);
+        dto.setMonto(new BigDecimal("100"));
+        dto.setBancoId(1L);
+
+        // WHEN
+        this.mockMvc.perform(MockMvcRequestBuilders.post("/api/cuentas/transferir")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(this.objectMapper.writeValueAsString(dto)))
+                // THEN
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.date").value(LocalDate.now().toString()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.mensaje").value("Transferencia realizada con éxito"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.transaccion.cuentaOrigenId").value(dto.getCuentaOrigenId()));
     }
 }

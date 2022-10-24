@@ -38,7 +38,7 @@ public class TransaccionDTO {
         return bancoId;
     }
 
-    public void getBancoId(Long bancoId) {
+    public void setBancoId(Long bancoId) {
         this.bancoId = bancoId;
     }
 }
