@@ -233,5 +233,28 @@ class CuentaControllerWebTestClientTest {
                 });
     }
 
+    @Test
+    @Order(8)
+    void testEliminar() {
+        // Dentro del método aplicamos varias peticiones antes y después de eliminar
+        // para asegurarnos de que efectivamente se eliminó el registro
+        this.client.get().uri("/api/cuentas").exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBodyList(Cuenta.class)
+                .hasSize(4);
 
+        this.client.delete().uri("/api/cuentas/4").exchange()
+                .expectStatus().isNoContent()
+                .expectBody().isEmpty();
+
+        this.client.get().uri("/api/cuentas").exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBodyList(Cuenta.class)
+                .hasSize(3);
+
+        this.client.get().uri("/api/cuentas/4").exchange()
+                .expectStatus().is5xxServerError();
+    }
 }

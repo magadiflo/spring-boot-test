@@ -71,4 +71,10 @@ public class CuentaServiceImpl implements ICuentaService {
         banco.setTotalTransferencia(++totalTransferencias);
         this.bancoRepository.save(banco);
     }
+
+    @Override
+    @Transactional
+    public void deleteById(Long id) {
+        this.cuentaRepository.deleteById(id);
+    }
 }

@@ -19,4 +19,6 @@ public interface ICuentaService {
 
     void transferir(Long cuentaOrigenId, Long cuentaDestinoId, BigDecimal monto, Long bancoId);
 
+    void deleteById(Long id);
+
 }
