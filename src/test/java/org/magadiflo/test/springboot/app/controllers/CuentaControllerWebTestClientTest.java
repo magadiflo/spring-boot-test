@@ -185,4 +185,53 @@ class CuentaControllerWebTestClientTest {
                 .hasSize(2) //2 elementos en el arreglo
                 .value(Matchers.hasSize(2)); //2 elementos del arreglo
     }
+
+    @Test
+    @Order(6)
+    void testGuardar() {
+        // GIVEN
+        Cuenta cuenta = new Cuenta(null, "Tinkler", new BigDecimal("3000"));
+
+        // WHEN
+        this.client.post().uri("/api/cuentas")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(cuenta)// En automático el bodyValue transforma a cuenta en un objeto JSON
+                .exchange()
+
+                // THEN
+                .expectStatus().isCreated()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(3)
+                .jsonPath("$.persona").value(Matchers.is("Tinkler"))
+                .jsonPath("$.saldo").isEqualTo(3000);
+    }
+
+    @Test
+    @Order(7)
+    void testGuardar2() {
+        // GIVEN
+        Cuenta cuenta = new Cuenta(null, "Pepe", new BigDecimal("4000"));
+
+        // WHEN
+        this.client.post().uri("/api/cuentas")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(cuenta)// En automático el bodyValue transforma a cuenta en un objeto JSON
+                .exchange()
+
+                // THEN
+                .expectStatus().isCreated()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody(Cuenta.class)
+                .consumeWith(resp -> {
+                    Cuenta c = resp.getResponseBody();
+
+                    assertNotNull(c);
+                    assertEquals("Pepe", c.getPersona());
+                    assertEquals(4, c.getId());
+                    assertEquals(Double.parseDouble("4000"), c.getSaldo().doubleValue());
+                });
+    }
+
+
 }
