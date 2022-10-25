@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -148,5 +149,30 @@ class CuentaControllerTestRestTemplateTest {
         assertEquals(3L, cuentaCreada.getId());
         assertEquals("Pepa", cuentaCreada.getPersona());
         assertEquals(Double.parseDouble("3800"), cuentaCreada.getSaldo().doubleValue());
+    }
+
+    @Test
+    @Order(5)
+    void testEliminar() {
+        ResponseEntity<Cuenta[]> response = this.client.getForEntity(this.crearUri("/api/cuentas"), Cuenta[].class);
+        List<Cuenta> cuentas = Arrays.asList(response.getBody());
+        assertEquals(3, cuentas.size());
+
+        Map<String, Object> pathVariables = new HashMap<>();
+        pathVariables.put("id", 3);
+
+        ResponseEntity<Void> exchange = this.client.exchange(this.crearUri("/api/cuentas/{id}"), HttpMethod.DELETE, null, Void.class, pathVariables);
+        assertEquals(HttpStatus.NO_CONTENT, exchange.getStatusCode());
+        assertFalse(exchange.hasBody());
+
+        //this.client.delete(this.crearUri("/api/cuentas/3")); //Antes y después de eliminar usamos los otros métodos para comprobar que se eliminó
+
+        response = this.client.getForEntity(this.crearUri("/api/cuentas"), Cuenta[].class);
+        cuentas = Arrays.asList(response.getBody());
+        assertEquals(2, cuentas.size());
+
+        ResponseEntity<Cuenta> responseDetalle = this.client.getForEntity(this.crearUri("/api/cuentas/3"), Cuenta.class);
+        assertEquals(HttpStatus.NOT_FOUND, responseDetalle.getStatusCode());
+        assertFalse(responseDetalle.hasBody());
     }
 }
