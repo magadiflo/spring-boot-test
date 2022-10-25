@@ -20,14 +20,20 @@ package org.magadiflo.test.springboot.app.controllers;
  * WebClient, este cliente es para aplicaciones reactivas en SpringBoot,
  * aquí solo lo usaremos (SpringWebFlux) para ejecutar nuestras pruebas y
  * no en nuestro proyecto o código principal
+ *
+ *
+ * NOTA:
+ * Solo en PRUEBAS DE INTEGRACIÓN podríamos darle un orden a los métodos de prueba,
+ * ya que esto evitaría que la modificación realizada por un método no afecte
+ * la ejecución de otro método
  */
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.hamcrest.Matchers;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
+import org.magadiflo.test.springboot.app.models.Cuenta;
 import org.magadiflo.test.springboot.app.models.dto.TransaccionDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,6 +49,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class CuentaControllerWebTestClientTest {
 
@@ -57,6 +64,7 @@ class CuentaControllerWebTestClientTest {
     }
 
     @Test
+    @Order(3)
     void testTransferir() throws JsonProcessingException {
         // GIVEN
         TransaccionDTO dto = new TransaccionDTO();
@@ -101,5 +109,38 @@ class CuentaControllerWebTestClientTest {
                 .jsonPath("$.transaccion.cuentaOrigenId").isEqualTo(dto.getCuentaOrigenId())
                 .jsonPath("$.date").isEqualTo(LocalDate.now().toString())
                 .json(this.objectMapper.writeValueAsString(response));
+    }
+
+    // A continuación se muestran dos formas de hacer la comprobación:
+    // 1) Con jsonPath(...) ----> testDetalle()
+    // 2) con consumeWith(...) ---> testDetalle2()
+    @Test
+    @Order(1)
+    void testDetalle() throws Exception {
+        Cuenta cuenta = new Cuenta(1L, "Martín", new BigDecimal("1000"));
+
+        this.client.get().uri("/api/cuentas/1")
+                .exchange() //Realizamos el request
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.persona").isEqualTo("Martín")
+                .jsonPath("$.saldo").isEqualTo(1000)
+                .json(this.objectMapper.writeValueAsString(cuenta)); //Esperamos obtener el json completo
+    }
+
+    @Test
+    @Order(2)
+    void testDetalle2() {
+        this.client.get().uri("/api/cuentas/2")
+                .exchange() //Realizamos el request
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody(Cuenta.class)
+                .consumeWith(resp -> {
+                    Cuenta cuenta = resp.getResponseBody();
+
+                    assertNotNull(cuenta);
+                    assertEquals("Gaspar", cuenta.getPersona());
+                    assertEquals("2000.00", cuenta.getSaldo().toPlainString());
+                });
     }
 }
