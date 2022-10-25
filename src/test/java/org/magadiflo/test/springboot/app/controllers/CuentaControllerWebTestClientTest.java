@@ -9,6 +9,10 @@ package org.magadiflo.test.springboot.app.controllers;
  * Cada vez que hagamos estas pruebas de integración, nuestro
  * backend debe estar levantado (ejm. Puerto 8080), ya que
  * se consumirán los endpoints y estos debe estar funcionando.
+ * [Actualización]: le quitamos el http://localhost:8080 a la
+ * ...uri("/api/cuentas/transferir"), de esa forma solo necesitamos
+ * ejecutar nuestro archivo de test y no es necesario levantar el backend
+ * previamente (esto siempre y cuando estamos en el mismo servidor)
  *
  * Para esto, se usarán clientes HTTP, como: RestTemplate y WebClient,
  * son los principales que SpringBoot ofrece para consumir Servicios Rest.
@@ -19,6 +23,7 @@ package org.magadiflo.test.springboot.app.controllers;
  */
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +35,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -66,13 +72,28 @@ class CuentaControllerWebTestClientTest {
         response.put("mensaje", "Transferencia realizada con éxito");
         response.put("transaccion", dto);
 
-        // THEN
-        this.client.post().uri("http://localhost:8080/api/cuentas/transferir")
+        // WHEN
+        this.client.post().uri("/api/cuentas/transferir")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(dto) //Por debajo ser convierte en JSON
                 .exchange() //Para enviar la solicitud
+
+                // THEN
                 .expectStatus().isOk()
                 .expectBody()
+                .consumeWith(respuesta -> {
+                    // Queremos convertir la respuesta en una estructura json
+                    try {
+                        JsonNode json = this.objectMapper.readTree(respuesta.getResponseBody());
+
+                        assertEquals("Transferencia realizada con éxito", json.path("mensaje").asText());
+                        assertEquals(1L, json.path("transaccion").path("cuentaOrigenId").asLong());
+                        assertEquals(LocalDate.now().toString(), json.path("date").asText());
+                        assertEquals("100", json.path("transaccion").path("monto").asText());
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                })
                 .jsonPath("$.mensaje").isNotEmpty()
                 .jsonPath("$.mensaje").value(Matchers.is("Transferencia realizada con éxito"))
                 .jsonPath("$.mensaje").value(valor -> assertEquals("Transferencia realizada con éxito", valor))
