@@ -2,6 +2,7 @@ package org.magadiflo.test.springboot.app;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.magadiflo.test.springboot.app.models.Cuenta;
 import org.magadiflo.test.springboot.app.repositories.ICuentaRepository;
@@ -17,6 +18,7 @@ import java.util.Optional;
  * @DataJpaTest, habilita el contexto de persistencia, bd en memoria, repositorios en spring,
  * inyección de dependencia, etc..
  */
+@Tag(value = "integracion_jpa")
 @DataJpaTest
 public class IntegracionJpaTest {
 
