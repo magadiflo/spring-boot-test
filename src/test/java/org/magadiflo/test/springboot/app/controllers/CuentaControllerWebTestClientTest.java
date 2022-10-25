@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -142,5 +143,46 @@ class CuentaControllerWebTestClientTest {
                     assertEquals("Gaspar", cuenta.getPersona());
                     assertEquals("2000.00", cuenta.getSaldo().toPlainString());
                 });
+    }
+
+    @Test
+    @Order(4)
+    void testListar() {
+        this.client.get().uri("/api/cuentas").exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$[0].persona").isEqualTo("Martín")
+                .jsonPath("$[0].id").isEqualTo(1)
+                .jsonPath("$[0].saldo").isEqualTo(900) //900, por el orden en que se ejecutaron los test
+                .jsonPath("$[1].persona").isEqualTo("Gaspar")
+                .jsonPath("$[1].id").isEqualTo(2)
+                .jsonPath("$[1].saldo").isEqualTo(2100)
+                .jsonPath("$").isArray()
+                .jsonPath("$").value(Matchers.hasSize(2));
+    }
+
+    @Test
+    @Order(5)
+    void testListar2() {
+        this.client.get().uri("/api/cuentas").exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBodyList(Cuenta.class)
+                .consumeWith(resp -> {
+                    List<Cuenta> cuentas = resp.getResponseBody();
+
+                    assertNotNull(cuentas);
+                    assertEquals(2, cuentas.size());
+                    assertEquals(1L, cuentas.get(0).getId());
+                    assertEquals("Martín", cuentas.get(0).getPersona());
+                    assertEquals(Double.parseDouble("900"), cuentas.get(0).getSaldo().doubleValue());
+
+                    assertEquals(2L, cuentas.get(1).getId());
+                    assertEquals("Gaspar", cuentas.get(1).getPersona());
+                    assertEquals(Double.parseDouble("2100"), cuentas.get(1).getSaldo().doubleValue());
+                })
+                .hasSize(2) //2 elementos en el arreglo
+                .value(Matchers.hasSize(2)); //2 elementos del arreglo
     }
 }
