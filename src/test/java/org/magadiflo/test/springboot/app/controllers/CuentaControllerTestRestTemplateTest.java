@@ -9,6 +9,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
+import org.magadiflo.test.springboot.app.models.Cuenta;
 import org.magadiflo.test.springboot.app.models.dto.TransaccionDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -82,5 +83,21 @@ class CuentaControllerTestRestTemplateTest {
         resp.put("transaccion", dto);
 
         assertEquals(this.objectMapper.writeValueAsString(resp), json);
+    }
+
+    @Test
+    @Order(2)
+    void testDetalle() {
+        ResponseEntity<Cuenta> response = this.client.getForEntity(this.crearUri("/api/cuentas/1"), Cuenta.class);
+        Cuenta cuenta = response.getBody();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+
+        assertNotNull(cuenta);
+        assertEquals(1L, cuenta.getId());
+        assertEquals("Martín", cuenta.getPersona());
+        assertEquals(Double.parseDouble("900"), cuenta.getSaldo().doubleValue());
+        assertEquals(new Cuenta(1L, "Martín", new BigDecimal("900.00")), cuenta);
     }
 }
