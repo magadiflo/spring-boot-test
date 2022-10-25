@@ -132,4 +132,21 @@ class CuentaControllerTestRestTemplateTest {
         assertEquals("Gaspar", jsonNode.get(1).path("persona").asText());
         assertEquals(2100D, jsonNode.get(1).path("saldo").asDouble());
     }
+
+    @Test
+    @Order(4)
+    void testGuardar() {
+        Cuenta cuenta = new Cuenta(null, "Pepa", new BigDecimal("3800"));
+        ResponseEntity<Cuenta> response = this.client.postForEntity(this.crearUri("/api/cuentas"), cuenta, Cuenta.class);
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+
+        Cuenta cuentaCreada = response.getBody();
+
+        assertNotNull(cuentaCreada);
+        assertEquals(3L, cuentaCreada.getId());
+        assertEquals("Pepa", cuentaCreada.getPersona());
+        assertEquals(Double.parseDouble("3800"), cuentaCreada.getSaldo().doubleValue());
+    }
 }
