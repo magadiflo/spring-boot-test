@@ -22,30 +22,31 @@
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-<!--			<scope>test</scope>-->
-		</dependency>
-		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
-
-<!--		En esta dependencia se incluye JUnit 5 y Mockito-->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-
 		<dependency>
 			<groupId>io.springfox</groupId>
 			<artifactId>springfox-boot-starter</artifactId>
 			<version>3.0.0</version>
 		</dependency>
 
-<!--		Solo tendrá alcance de test, ya que será usado
-            únicamente para nuestro entorno de pruebas -->
+		<!-- En esta dependencia se incluye JUnit 5 y Mockito -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- Para poder realizar las pruebas unitarias a los repositorios. Es una bd en memoria. -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<!-- Lo comentamos para que el H2 esté habilitado a cualquier contexto, tanto
+			para test como para la aplicación -->
+			<!--<scope>test</scope>-->
+		</dependency>
+		<!-- Solo tendrá alcance de test, ya que será usado
+        únicamente para nuestro entorno de pruebas -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webflux</artifactId>

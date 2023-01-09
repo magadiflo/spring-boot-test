@@ -22,15 +22,41 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 
-@WebMvcTest(CuentaController.class) //Testearemos el controller CuentaController
+/**
+ * Pruebas unitarias a controlador del tipo Rest CuentaController
+ * **************************************************************
+ */
+
+/**
+ * @WebMvcTest **************
+ * Como probaremos un controlador, debemos configurar el contexto Mvc Test
+ * usando esa anotación. Dentro de la anotación indicamos el controlador
+ * que vamos a probar
+ */
+@WebMvcTest(CuentaController.class)
 class CuentaControllerTest {
 
+    /**
+     * MockMvc
+     * *******
+     * Implementación de mockito para probar un controlador.
+     * Es el contexto de MVC, pero falso, el servidor HTTP es simulado: request, response, etc.
+     * es decir, no estamos trabajando sobre un servidor real HTTP.
+     */
     @Autowired
-    private MockMvc mockMvc; //Es el contexto de MVC, pero falso (simulado: request, response, etc.)
+    private MockMvc mockMvc;
 
     @MockBean
     private CuentaServiceImpl cuentaService;
 
+    /**
+     * ObjectMapper
+     * ************
+     * Nos permite convertir cualquier objeto en un JSON y
+     * viceversa, un JSON en un objeto que por su puesto debe
+     * existir esa clase, donde los atributos de la clase coincidan
+     * con los nombres de atributos del json y viceversa.
+     */
     ObjectMapper objectMapper;
 
     @BeforeEach
@@ -41,12 +67,39 @@ class CuentaControllerTest {
     @Test
     void testDetalle() throws Exception {
         // GIVEN
-        // Cuando en el controlador se llame internamente al método this.cuentaService.findById(...), el mock actuará
-        // para simular la respuesta de ese método (this.cuentaService.findById(...))
+        /**
+         * Como nuestra clase a probar es un Controlador: CuentaController, este tiene
+         * como dependencia al service CuentaServiceImpl, pero a nosotros nos interesa probar
+         * únicamente el controlador, por lo tanto las dependencias (servicios) los
+         * mockearemos con Mockito.
+         *
+         * Ahora, aquí probaremos el método detalle() del controlador, este método
+         * en su interior hace uso del servicio: this.cuentaService.findById(...), por lo que
+         * necesitamos mockear la respuesta de ese servicio y eso lo hacemos con Mockito
+         * con el método Mockito.when(...) tal como sigue a continuación:
+         */
         Mockito.when(this.cuentaService.findById(1L)).thenReturn(Datos.cuenta001().orElseThrow());
 
         // WHEN
-        // Se realiza la llamada al controlador mediante la ruta (endpoint)
+        /**
+         * mockMvc.perform(...)
+         * ********************
+         * Se realiza la llamada simulada al controlador real mediante la ruta (endpoint),
+         * por eso usamos el MockMvc.
+         *
+         * Hay que recordar que, a través de la url (endpoint) más el método http
+         * se puede saber a qué método del controlador se hará la prueba. En este caso, se usa
+         * la clase MockMvcRequestBuilders para decirle que a través del método .get(...)
+         * haga la llamada a la url definida en su interior. Esto corresponde al método
+         * detalle(...) del CuentaController.
+         *
+         * El controlador real recibirá esa llamada y como internamente hace uso del
+         * this.cuentaService.findById(...) el cual mockeamos en la parte superior, pues este
+         * controlador real devolverá el valor que le definimos al mock para que devuelva.
+         *
+         * El valor devuelto por el controlador es usado en el método .andExpect(...)
+         * para verificar si los valores devueltos son los esperados.
+         */
         mockMvc.perform(MockMvcRequestBuilders.get("/api/cuentas/1")
                         .contentType(MediaType.APPLICATION_JSON))
                 // THEN
@@ -117,11 +170,22 @@ class CuentaControllerTest {
     void testGuardar() throws Exception {
         // GIVEN
         Cuenta cuenta = new Cuenta(null, "Tinkler", new BigDecimal("3000"));
+
+        // Una forma de capturar el argumento (cuenta) para agregarle un id y retornarlo
+        /*
         Mockito.when(this.cuentaService.save(Mockito.any())).then(invocation -> {
             Cuenta c = invocation.getArgument(0);
             c.setId(3L);
             return c;
         });
+        */
+
+        // Otra forma de capturar el argument (cuenta) agregarle un id y retornarlo
+        Mockito.doAnswer(invocation -> {
+            Cuenta c = invocation.getArgument(0);
+            c.setId(3L);
+            return c;
+        }).when(this.cuentaService).save(Mockito.any(Cuenta.class));
 
         // WHEN
         this.mockMvc.perform(MockMvcRequestBuilders.post("/api/cuentas")
@@ -130,10 +194,17 @@ class CuentaControllerTest {
                 // THEN
                 .andExpect(MockMvcResultMatchers.status().isCreated())
                 .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+
+                // Una forma de comparar es con Matchers.is(...) dentro del .jsonPath(...)
                 .andExpect(MockMvcResultMatchers.jsonPath("$.id", Matchers.is(3)))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.persona", Matchers.is("Tinkler")))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.saldo", Matchers.is(3000)));
+                .andExpect(MockMvcResultMatchers.jsonPath("$.saldo", Matchers.is(3000)))
 
-        Mockito.verify(this.cuentaService).save(Mockito.any());
+                // Otra forma de comparar es con .value(...) después de .jsonPath(...)
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(3))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.persona").value("Tinkler"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.saldo").value(3000));
+
+        Mockito.verify(this.cuentaService).save(Mockito.any(Cuenta.class));
     }
 }

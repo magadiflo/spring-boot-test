@@ -1,11 +1,10 @@
-package org.magadiflo.test.springboot.app;
+package org.magadiflo.test.springboot.app.repositories;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.magadiflo.test.springboot.app.models.Cuenta;
-import org.magadiflo.test.springboot.app.repositories.ICuentaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
@@ -14,13 +13,61 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
-/***
- * @DataJpaTest, habilita el contexto de persistencia, bd en memoria, repositorios en spring,
- * inyección de dependencia, etc..
+/**
+ * Pruebas unitarias al repositorio
+ * ********************************
+ */
+
+/**
+ * @DataJpaTest
+ * *************
+ * Autoconfigura la la Base de Datos H2 (bd en memoria), con una conexión por defecto.
+ * Configura el contexto de persistencia, todo lo que es JPA/Hibernate, realiza un
+ * entity scan para escanear las entidades mapeadas a las tablas de la BD, activa el log SQL
+ * para mostrar las consultas y operaciones que se están realizando en el contexto test, etc..
+ *
+ * Permitirá hacer las pruebas con conexión a la BD (h2) definida en el application.properties
+ * del directorio src/test/resources
+ */
+
+/**
+ * Ejecutando Pruebas Unitarias
+ * *********************************
+ * Cada vez que ejecutamos las pruebas, crea las tablas en memoria (H2) y al finalizar
+ * la ejecución de todas las pruebas las elimina.
+ *
+ * Cada método test es independiente, es decir si un método test realiza alguna modificación
+ * en alguna tabla, ya sea una eliminación, una actualización, etc. al finalizar ese método
+ * test, se realiza un rollback para que cuando inicie el siguiente test se empiece con los
+ * datos originales, es decir sin modificación. De esa forma todos los test iniciarán siempre
+ * con el mismo estado de las tablas.
+ */
+
+/**
+ * Tener en cuenta:
+ * ****************
+ * El repositorio que vamos a probar es ICuentaRepository donde definimos dos métodos personalizados
+ * y además hacemos que herede de JpaRepository:
+ *
+ * findByPersona(persona);
+ * encuentraPorPersona(persona);
+ *
+ * Ahora, cuando hagamos pruebas, únicamente probaremos los métodos que nosotros creemos,
+ * en este caso, deberíamos probar solo esos dos métodos personalizados.
+ * Ahora, como en el ICuentaRepository estamos extendiendo de JpaRepository, tendremos muchos más métodos,
+ * pero son métodos que ya vienen, y nosotros no debemos probar eso porque ya nos los proporcionan
+ * probados.
+ *
+ * CONCLUSIÓN: Los únicos métodos que debemos probar son los métodos que agregamos a nuestra interfaz,
+ * en nuestro caso el findByPersona(persona) y el encuentraPorPersona(persona).
+ *
+ * Ahora, siguiendo el tutorial, se hacen pruebas de los métodos que no hemos creado
+ * como el .findAll(), .save(...), etc. pero solo para temas de aprendizaje, ya en el campo real
+ * deberíamos hacer pruebas solo de aquellos métodos que nosotros hemos creado.
  */
 @Tag(value = "integracion_jpa")
 @DataJpaTest
-public class IntegracionJpaTest {
+public class ICuentaRepositoryTest {
 
     @Autowired
     ICuentaRepository cuentaRepository;
@@ -67,6 +114,7 @@ public class IntegracionJpaTest {
         //Cuenta cuenta = this.cuentaRepository.findById(cuentaSave.getId()).orElseThrow();
 
         // Then
+        assertNotNull(cuenta.getId());
         assertEquals("Pepe", cuenta.getPersona());
         assertEquals("3000", cuenta.getSaldo().toPlainString());
         //assertEquals(3, cuenta.getId()); no es recomendable usar el id ya que podría cambiar
