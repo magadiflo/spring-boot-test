@@ -1,7 +1,7 @@
 package org.magadiflo.test.springboot.app.controllers;
 
 /***
- * PRUEBAS DE INTEGRACIÓN A SERVICIOS REST
+ * PRUEBAS DE INTEGRACIÓN USANDO WebClient
  * ***************************************
  * Se harán pruebas reales, es decir ya no con Mocks,
  * sino con los servicios, los request, responses, etc.. reales.
@@ -26,6 +26,12 @@ package org.magadiflo.test.springboot.app.controllers;
  * Solo en PRUEBAS DE INTEGRACIÓN podríamos darle un orden a los métodos de prueba,
  * ya que esto evitaría que la modificación realizada por un método no afecte
  * la ejecución de otro método
+ *
+ * *************************************************************************
+ * IMPORTANTE:
+ * Siempre tendremos un solo tipo de prueba de integración ya sea
+ * usando RestTemplate o WebClient
+ * *************************************************************************
  */
 
 import com.fasterxml.jackson.core.JsonProcessingException;

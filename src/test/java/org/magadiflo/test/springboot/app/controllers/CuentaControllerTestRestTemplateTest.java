@@ -1,8 +1,15 @@
 package org.magadiflo.test.springboot.app.controllers;
 
 /***
- * TEST DE INTEGRACIÓN USANDO RestTemplate
- * ***************************************
+ * PRUEBA DE INTEGRACIÓN USANDO RestTemplate
+ * *****************************************
+ *
+ *
+ * *************************************************************************
+ * IMPORTANTE:
+ * Siempre tendremos un solo tipo de prueba de integración ya sea
+ * usando RestTemplate o WebClient
+ * *************************************************************************
  */
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -39,7 +46,9 @@ class CuentaControllerTestRestTemplateTest {
 
     private ObjectMapper objectMapper;
 
-    @LocalServerPort //Importa el puerto de forma automática
+    //Importamos el puerto de forma automática. Esta forma también
+    // es válido para el otro test de CuentaControllerWebTestClientTest
+    @LocalServerPort
     private int puerto;
 
     @BeforeEach
@@ -47,6 +56,8 @@ class CuentaControllerTestRestTemplateTest {
         this.objectMapper = new ObjectMapper();
     }
 
+    // Como ya podemos obtener el puerto de forma automática, podemos construir
+    // toda la url para este servidor a donde se hará la petición
     private String crearUri(String uri) {
         return String.format("http://localhost:%d%s", this.puerto, uri);
     }
@@ -64,20 +75,15 @@ class CuentaControllerTestRestTemplateTest {
                 this.client.postForEntity(this.crearUri("/api/cuentas/transferir"), dto, String.class);
         String json = response.getBody();
 
-        System.out.printf("Puerto: %s %n", this.puerto);
+        System.out.println("Petición a: " + this.crearUri("/api/cuentas/transferir"));
         System.out.println(json);
 
+        // Con el json en string tenemos que estar preguntando con contains, si tiene tal estructura
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertNotNull(json);
         assertTrue(json.contains("Transferencia realizada con éxito"));
         assertTrue(json.contains("{\"cuentaOrigenId\":1,\"cuentaDestinoId\":2,\"monto\":100,\"bancoId\":1}"));
-
-        JsonNode jsonNode = this.objectMapper.readTree(json);
-        assertEquals("Transferencia realizada con éxito", jsonNode.path("mensaje").asText());
-        assertEquals(LocalDate.now().toString(), jsonNode.path("date").asText());
-        assertEquals(100d, jsonNode.path("transaccion").path("monto").asDouble());
-        assertEquals(1L, jsonNode.path("transaccion").path("cuentaOrigenId").asLong());
 
         Map<String, Object> resp = new HashMap<>();
         resp.put("date", LocalDate.now().toString());
@@ -87,6 +93,14 @@ class CuentaControllerTestRestTemplateTest {
         resp.put("transaccion", dto);
 
         assertEquals(this.objectMapper.writeValueAsString(resp), json);
+
+        // Con JsonNode da mayor flexibilidad y comparar por cada propiedad del json
+        JsonNode jsonNode = this.objectMapper.readTree(json);
+        assertEquals("Transferencia realizada con éxito", jsonNode.path("mensaje").asText());
+        assertEquals(LocalDate.now().toString(), jsonNode.path("date").asText());
+        assertEquals(100d, jsonNode.path("transaccion").path("monto").asDouble());
+        assertEquals(1L, jsonNode.path("transaccion").path("cuentaOrigenId").asLong());
+
     }
 
     @Test
@@ -159,6 +173,7 @@ class CuentaControllerTestRestTemplateTest {
         List<Cuenta> cuentas = Arrays.asList(response.getBody());
         assertEquals(3, cuentas.size());
 
+        // Forma de eliminar 1
         Map<String, Object> pathVariables = new HashMap<>();
         pathVariables.put("id", 3);
 
@@ -166,7 +181,8 @@ class CuentaControllerTestRestTemplateTest {
         assertEquals(HttpStatus.NO_CONTENT, exchange.getStatusCode());
         assertFalse(exchange.hasBody());
 
-        //this.client.delete(this.crearUri("/api/cuentas/3")); //Antes y después de eliminar usamos los otros métodos para comprobar que se eliminó
+        // Forma de eliminar 2
+        //this.client.delete(this.crearUri("/api/cuentas/3"));
 
         response = this.client.getForEntity(this.crearUri("/api/cuentas"), Cuenta[].class);
         cuentas = Arrays.asList(response.getBody());
