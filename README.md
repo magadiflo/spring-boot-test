@@ -385,3 +385,77 @@ class AccountServiceImplUnitTest {
     }
 }
 ````
+
+## Escribiendo tests assertThrow para afirmar que la excepción lanzada sea correcta
+
+Crearemos un test para verificar que se esté lanzando nuestra excepción personalizada **InsufficientMoneyException**
+cuando el monto a transferir sea mayor que el saldo disponible de la cuenta origen.
+
+````java
+class AccountServiceImplUnitTest {
+    IAccountRepository accountRepository;
+    IBankRepository bankRepository;
+
+    AccountServiceImpl accountService;
+
+    @BeforeEach
+    void setUp() {
+        this.accountRepository = mock(IAccountRepository.class);
+        this.bankRepository = mock(IBankRepository.class);
+
+        this.accountService = new AccountServiceImpl(this.accountRepository, this.bankRepository);
+    }
+
+    @Test
+    void willThrowExceptionWhenBalanceIsLessThanAmountToBeTransfer() {
+        Long accountIdOrigen = 1L;
+        Long accountIdDestination = 2L;
+        Long bankId = 1L;
+
+        when(this.accountRepository.findById(accountIdOrigen)).thenReturn(DataTest.account001());
+        when(this.accountRepository.findById(accountIdDestination)).thenReturn(DataTest.account002());
+        when(this.bankRepository.findById(bankId)).thenReturn(DataTest.bank());
+
+        BigDecimal balanceOriginal = this.accountService.reviewBalance(accountIdOrigen);
+        BigDecimal balanceDestination = this.accountService.reviewBalance(accountIdDestination);
+
+        assertEquals(2000D, balanceOriginal.doubleValue());
+        assertEquals(1000D, balanceDestination.doubleValue());
+
+        InsufficientMoneyException exception = assertThrows(InsufficientMoneyException.class, () -> {
+            this.accountService.transfer(bankId, accountIdOrigen, accountIdDestination, new BigDecimal("2500"));
+        });
+
+        assertEquals(InsufficientMoneyException.class, exception.getClass());
+
+        balanceOriginal = this.accountService.reviewBalance(accountIdOrigen);
+        balanceDestination = this.accountService.reviewBalance(accountIdDestination);
+
+        assertEquals(2000D, balanceOriginal.doubleValue());
+        assertEquals(1000D, balanceDestination.doubleValue());
+
+        int total = this.accountService.reviewTotalTransfers(bankId);
+        assertEquals(0, total);
+
+        verify(this.accountRepository, times(3)).findById(accountIdOrigen);
+        verify(this.accountRepository, times(3)).findById(accountIdDestination);
+        verify(this.accountRepository, never()).update(any(Account.class));
+
+        verify(this.bankRepository, times(1)).findById(bankId);
+        verify(this.bankRepository, never()).update(any(Bank.class));
+    }
+}
+````
+
+Ahora, como estamos probando que lance la excepción vemos que algunos métodos mockeados no se van a ejecutar, por lo
+tanto, el número de veces del **verify** va a cambiar.
+
+**NOTA**
+
+> Inicialmente, habíamos creado nuestra clase **DataTest** conteniendo métodos estáticos que nos devuelven valores para
+> poder usarlos en nuestras pruebas. Pero **¿por qué tienen que ser métodos estáticos?**, si usamos los métodos
+> estáticos, cada vez que lo llamemos nos va a devolver una nueva instancia de lo que esté devolviendo. Mientras que si
+> los datos los hacemos atributos estáticos, podría suceder que en un método test modifiquemos el atributo y cuando se
+> use en otro método test, no tendrá los valores originales, ya que fueron modificados, entonces para evitar ese
+> problema fue que los datos de prueba los definimos dentro de métodos estáticos.
+
