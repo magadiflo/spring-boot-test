@@ -195,6 +195,8 @@ public class AccountServiceImpl implements IAccountService {
 }
 ````
 
+---
+
 ## Creando nuestros datos de prueba
 
 Crearemos algunos datos de prueba para comenzar a realizar los test a las distintas capas.
@@ -214,4 +216,114 @@ public class DataTest {
     }
 }
 ````
-## 
+
+## Escribiendo nuestros tests con JUnit y Mockito
+
+Antes de continuar, revisemos la clase de test que Spring Boot crea cuando creamos un nuevo proyecto de Spring Boot:
+
+````java
+
+@SpringBootTest
+class SpringBootTestApplicationTests {
+    @Test
+    void contextLoads() {
+    }
+}
+````
+
+**DONDE**
+
+- Por defecto nos crea una clase de prueba que tiene el nombre de la aplicación.
+- Crea un método anotado con **@Test** que es una anotación de **JUnit 5** para indicarnos que será un método a testear.
+- Anota la clase con **@SpringBootTest**, ¿Qué hace esta anotación?
+
+**@SpringBootTest**
+
+> Spring Boot proporciona esta anotación para las **pruebas de integración**. Esta anotación crea un contexto para la
+> aplicación y carga el contexto completo de la aplicación.
+>
+> **@SpringBootTest** arranca el contexto completo de la aplicación, lo que significa que podemos usar el **@Autowired**
+> para poder usar inyección de dependencia.
+>
+> **@SpringBootTest** inicia el servidor embebido, crea un entorno web y a continuación, permite a los métodos test
+> realizar pruebas de integración.
+>
+> De forma predeterminada, **@SpringBootTest** no inicia un servidor, necesitamos agregar el atributo **webEnvironment**
+> para refinar aún más cómo se ejecutan sus pruebas.
+>
+> Indica que la clase de prueba es una prueba de Spring Boot y proporciona una serie de características y
+> configuraciones específicas para realizar **pruebas de integración** en una aplicación de Spring Boot.
+>
+> Al utilizar la anotación **@SpringBootTest**, se **cargará el contexto de la aplicación de Spring Boot completo** para
+> la prueba. Esto significa que se inicializarán todos los componentes, configuraciones y dependencias de la aplicación,
+> de manera similar a como se ejecutaría la aplicación en un entorno de producción. Esto permite realizar pruebas de
+> integración más realistas, donde se pueden probar las interacciones y el comportamiento de la aplicación en un entorno
+> similar al de producción.
+
+Por lo tanto, como iniciaremos con **Pruebas Unitarias** eliminaremos esa clase de prueba creada automáticamente, para
+dar paso a la creación de nuestra propia clase.
+
+## Pruebas Unitarias para el service AccountServiceImpl - Mockeo manual
+
+A continuación se muestra la creación de nuestra clase de prueba para el servicio **AccountServiceImpl** con la creación
+de un test unitario:
+
+````java
+class AccountServiceImplUnitTest {
+
+    IAccountRepository accountRepository;
+    IBankRepository bankRepository;
+
+    AccountServiceImpl accountService;
+
+    @BeforeEach
+    void setUp() {
+        this.accountRepository = mock(IAccountRepository.class);
+        this.bankRepository = mock(IBankRepository.class);
+
+        this.accountService = new AccountServiceImpl(this.accountRepository, this.bankRepository);
+    }
+
+    @Test
+    void canTransferBetweenAccounts() {
+        Long accountIdOrigen = 1L;
+        Long accountIdDestination = 2L;
+        Long bankId = 1L;
+
+        when(this.accountRepository.findById(accountIdOrigen)).thenReturn(DataTest.account001());
+        when(this.accountRepository.findById(accountIdDestination)).thenReturn(DataTest.account002());
+        when(this.bankRepository.findById(bankId)).thenReturn(DataTest.bank());
+
+        BigDecimal balanceOriginal = this.accountService.reviewBalance(accountIdOrigen);
+        BigDecimal balanceDestination = this.accountService.reviewBalance(accountIdDestination);
+
+        assertEquals(2000D, balanceOriginal.doubleValue());
+        assertEquals(1000D, balanceDestination.doubleValue());
+
+        this.accountService.transfer(bankId, accountIdOrigen, accountIdDestination, new BigDecimal("500"));
+
+        balanceOriginal = this.accountService.reviewBalance(accountIdOrigen);
+        balanceDestination = this.accountService.reviewBalance(accountIdDestination);
+
+        assertEquals(1500D, balanceOriginal.doubleValue());
+        assertEquals(1500D, balanceDestination.doubleValue());
+    }
+}
+````
+
+**NOTA**
+
+- En el curso, el profesor **Andrés Guzmán** dejó la clase anotada con **@SpringBootTest**, pero según lo que investigué
+  y coloqué la información en la parte superior, esta anotación es para **Pruebas de Integración**, es por eso que yo
+  omito esa anotación, ya que ahora estamos en **pruebas unitarias.**
+- Por el momento, **no hemos agregado ninguna anotación** sobre nuestra clase de prueba.
+- En el método anotado con **@BeforeEach**, que es el método del ciclo de vida de **JUnit** estamos creando manualmente
+  las instancias **mockeadas** de las dependencias de nuestra clase de servicio. Para ello usamos el método estático de
+  Mockito: ``mock(IAccountRepository.class)`` y el ``mock(IBankRepository.class)``.
+- Usamos las **dependencias mockeadas manualmente** para crear nuestro objeto de prueba, el cual requiere que se le pase
+  por constructor las dependencias de cuenta y banco:
+  ``new AccountServiceImpl(this.accountRepository, this.bankRepository)``.
+- Como resultado tenemos, nuestras dos dependencias mockeadas: ``this.accountRepository`` y ``this.bankRepository`` y
+  nuestra clase de servicio que es el que será sometido a los tests: ``this.accountService``.
+- Sobre el método test, no hace falta explicar, es como lo hemos venido trabajando hasta ahora. Si ejecutamos esta clase
+  de prueba, veremos que **el test pasará exitosamente**.
