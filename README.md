@@ -327,3 +327,61 @@ class AccountServiceImplUnitTest {
   nuestra clase de servicio que es el que será sometido a los tests: ``this.accountService``.
 - Sobre el método test, no hace falta explicar, es como lo hemos venido trabajando hasta ahora. Si ejecutamos esta clase
   de prueba, veremos que **el test pasará exitosamente**.
+
+## Test Verify
+
+En el test anterior no realizamos los verify, es importante también usarlos, porque con ellos nos aseguramos de que se
+estén llamando los métodos mockeados el número de veces determinados:
+
+````java
+class AccountServiceImplUnitTest {
+
+    IAccountRepository accountRepository;
+    IBankRepository bankRepository;
+
+    AccountServiceImpl accountService;
+
+    @BeforeEach
+    void setUp() {
+        this.accountRepository = mock(IAccountRepository.class);
+        this.bankRepository = mock(IBankRepository.class);
+
+        this.accountService = new AccountServiceImpl(this.accountRepository, this.bankRepository);
+    }
+
+    @Test
+    void canTransferBetweenAccounts() {
+        Long accountIdOrigen = 1L;
+        Long accountIdDestination = 2L;
+        Long bankId = 1L;
+
+        when(this.accountRepository.findById(accountIdOrigen)).thenReturn(DataTest.account001());
+        when(this.accountRepository.findById(accountIdDestination)).thenReturn(DataTest.account002());
+        when(this.bankRepository.findById(bankId)).thenReturn(DataTest.bank());
+
+        BigDecimal balanceOriginal = this.accountService.reviewBalance(accountIdOrigen);
+        BigDecimal balanceDestination = this.accountService.reviewBalance(accountIdDestination);
+
+        assertEquals(2000D, balanceOriginal.doubleValue());
+        assertEquals(1000D, balanceDestination.doubleValue());
+
+        this.accountService.transfer(bankId, accountIdOrigen, accountIdDestination, new BigDecimal("500"));
+
+        balanceOriginal = this.accountService.reviewBalance(accountIdOrigen);
+        balanceDestination = this.accountService.reviewBalance(accountIdDestination);
+
+        assertEquals(1500D, balanceOriginal.doubleValue());
+        assertEquals(1500D, balanceDestination.doubleValue());
+
+        int total = this.accountService.reviewTotalTransfers(bankId);
+        assertEquals(1, total);
+
+        verify(this.accountRepository, times(3)).findById(accountIdOrigen);
+        verify(this.accountRepository, times(3)).findById(accountIdDestination);
+        verify(this.accountRepository, times(2)).update(any(Account.class));
+
+        verify(this.bankRepository, times(2)).findById(bankId);
+        verify(this.bankRepository).update(any(Bank.class));
+    }
+}
+````
