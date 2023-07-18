@@ -459,3 +459,37 @@ tanto, el número de veces del **verify** va a cambiar.
 > use en otro método test, no tendrá los valores originales, ya que fueron modificados, entonces para evitar ese
 > problema fue que los datos de prueba los definimos dentro de métodos estáticos.
 
+## Escribiendo test con los assertSame
+
+Con el **assertSame()** verificamos que ambos objetos comparados sean el mismo.
+
+````java
+class AccountServiceImplUnitTest {
+
+    IAccountRepository accountRepository;
+    IBankRepository bankRepository;
+
+    AccountServiceImpl accountService;
+
+    @BeforeEach
+    void setUp() {
+        this.accountRepository = mock(IAccountRepository.class);
+        this.bankRepository = mock(IBankRepository.class);
+
+        this.accountService = new AccountServiceImpl(this.accountRepository, this.bankRepository);
+    }
+
+    @Test
+    void canVerifyThatTwoInstancesAreTheSame() {
+        when(this.accountRepository.findById(1L)).thenReturn(DataTest.account001());
+
+        Account account1 = this.accountService.findById(1L).get();
+        Account account2 = this.accountService.findById(1L).get();
+
+        assertSame(account1, account2);
+        assertEquals("Martín", account1.getPerson());
+        assertEquals("Martín", account2.getPerson());
+        verify(this.accountRepository, times(2)).findById(1L);
+    }
+}
+````

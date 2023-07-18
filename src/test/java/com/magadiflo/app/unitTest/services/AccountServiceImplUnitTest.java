@@ -103,4 +103,17 @@ class AccountServiceImplUnitTest {
         verify(this.bankRepository, times(1)).findById(bankId);
         verify(this.bankRepository, never()).update(any(Bank.class));
     }
+
+    @Test
+    void canVerifyThatTwoInstancesAreTheSame() {
+        when(this.accountRepository.findById(1L)).thenReturn(DataTest.account001());
+
+        Account account1 = this.accountService.findById(1L).get();
+        Account account2 = this.accountService.findById(1L).get();
+
+        assertSame(account1, account2);
+        assertEquals("Martín", account1.getPerson());
+        assertEquals("Martín", account2.getPerson());
+        verify(this.accountRepository, times(2)).findById(1L);
+    }
 }
