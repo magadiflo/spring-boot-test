@@ -55,3 +55,49 @@ Al proyecto creado desde Spring Initilizr le agregaremos una única dependencia 
 Observamos que además de la dependencia **spring-boot-starter-web** que nosotros agregamos, se nos agregó en automático
 otra dependencia: **spring-boot-starter-test**, ``esta dependencia incluye JUnit 5 y Mockito.``
 
+## Creando las clases del modelo
+
+Nuestras clases de modelo serán similares a las que creamos en la sección de **JUnit 5**. Por ahora solo crearemos las
+clases que posteriormente usaremos para realizar las pruebas:
+
+````java
+public class InsufficientMoneyException extends RuntimeException {
+    public InsufficientMoneyException(String message) {
+        super(message);
+    }
+}
+````
+
+````java
+public class Bank {
+    private Long id;
+    private String name;
+    private int totalTransfers;
+
+    /* constructors, getters, setters and toString() */
+}
+````
+
+````java
+public class Account {
+    private Long id;
+    private String person;
+    private BigDecimal balance;
+
+    /* constructors, getters, setters */
+
+    public void debit(BigDecimal amount) {
+        BigDecimal newBalance = this.balance.subtract(amount);
+        if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InsufficientMoneyException("Dinero insuficiente en la cuenta");
+        }
+        this.balance = newBalance;
+    }
+
+    public void credit(BigDecimal amount) {
+        this.balance = this.balance.add(amount);
+    }
+
+    /* equals(), hasCode() and toString() */
+}
+````
