@@ -101,3 +101,43 @@ public class Account {
     /* equals(), hasCode() and toString() */
 }
 ````
+
+## Creando los repositorios
+
+Repositorio para nuestro modelo **Account**:
+
+````java
+public interface IAccountRepository {
+    List<Account> findAll();
+
+    Optional<Account> findById(Long id);
+
+    Account update(Account account);
+}
+````
+
+Repositorio para nuestro modelo **Bank**:
+
+````java
+public interface IBankRepository {
+    List<Bank> findAll();
+
+    Optional<Bank> findById(Long id);
+
+    Bank update(Bank bank);
+}
+````
+
+Interfaz para la capa de servicio:
+
+````java
+public interface IAccountService {
+    Optional<Account> findById(Long id);
+
+    int reviewTotalTransfers(Long bancoId);
+
+    BigDecimal reviewBalance(Long accountId);
+
+    void transfer(Long accountIdOrigen, Long accountIdDestination, BigDecimal amount);
+}
+````
