@@ -493,3 +493,49 @@ class AccountServiceImplUnitTest {
     }
 }
 ````
+
+## Pruebas Unitarias para el service AccountServiceImpl - Mockeo con anotaciones de Mockito
+
+Crearemos una nueva clase de prueba para nuestro servicio **AccountServiceImpl** al que le llamaremos
+**AccountServiceImplWithMockitoAnnotationsUnitTest**. Esta nueva clase de prueba contendrá los mismos métodos test que
+creamos en la clase de prueba **AccountServiceImplUnitTest**. ¿Y para qué estamos creando otra clase con los mismos
+métodos?, pues en la clase **AccountServiceImplUnitTest creamos los mocks de las dependencias de manera manual** tal
+como se muestra a continuación: ``mock(IAccountRepository.class)``, entonces lo que buscamos con esta nueva clase de
+test es **crear los Mocks de otra manera, utilizando las anotaciones de Mockito**, de esta manera los mocks se crearán
+de manera automática.
+
+````java
+
+@ExtendWith(MockitoExtension.class)             // (1)
+class AccountServiceImplWithMockitoAnnotationsUnitTest {
+    @Mock                                       // (2)
+    IAccountRepository accountRepository;
+    @Mock                                       // (3)
+    IBankRepository bankRepository;
+    @InjectMocks                                // (4)
+    AccountServiceImpl accountService;
+
+    @Test
+    void canTransferBetweenAccounts() { /* omitted code */ }
+
+    @Test
+    void willThrowExceptionWhenBalanceIsLessThanAmountToBeTransfer() { /* omitted code */ }
+
+    @Test
+    void canVerifyThatTwoInstancesAreTheSame() { /*omitted code */ }
+}
+````
+
+**DONDE**
+
+- **(1)** por norma general, para generar los test unitarios sobre los servicios y/o componentes simplemente debemos de
+  definir tests que funcionen con la extensión de Mockito **@ExtendWith(MockitoExtension.class)**. Esta anotación nos
+  permite habilitar las anotaciones de mockito: **@Mock, @InjectMocks, @Spy, entre otras.**.
+- **(2) y (3)** son anotaciones de mockito que nos permite **mockear** las dependencias sobre las que están anotadas. En
+  nuestro caso, nos permite crear un mock del **IAccountRepository** y del **IBankRepository**.
+- **(4)** nos permite inyectar los mocks anteriormente definidos: **IAccountRepository** y el **IBankRepository** en la
+  instancia del **AccountServiceImpl**. ¡Importante!, el **@InjectMocks** tiene que estar anotada sobre una clase
+  concreta.
+
+Y eso es todo, si ejecutamos los test de nuestra nueva clase, veremos que todo seguirá funcionando como antes, pero esta
+vez estamos creando los **Mocks** usando las anotaciones de **Mockito**.
