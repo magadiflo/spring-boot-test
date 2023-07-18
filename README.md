@@ -194,3 +194,24 @@ public class AccountServiceImpl implements IAccountService {
     }
 }
 ````
+
+## Creando nuestros datos de prueba
+
+Crearemos algunos datos de prueba para comenzar a realizar los test a las distintas capas.
+
+````java
+public class DataTest {
+    public static Optional<Account> account001() {
+        return Optional.of(new Account(1L, "Martín", new BigDecimal("2000")));
+    }
+
+    public static Optional<Account> account002() {
+        return Optional.of(new Account(2L, "Alicia", new BigDecimal("1000")));
+    }
+
+    public static Optional<Bank> bank() {
+        return Optional.of(new Bank(1L, "Banco de la Nación", 0));
+    }
+}
+````
+## 
