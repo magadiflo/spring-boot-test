@@ -600,3 +600,14 @@ Listo, si ejecutamos nuestra nueva clase de test **AccountServiceImplWithSpringB
 se ejecutará exitosamente, con una observación: **Ahora se está creando un contexto para la aplicación**, es por esa
 razón que cuando ejecutamos el test de dicha clase, vemos que en la consola aparece la presentación clásica de
 Spring Boot.
+
+## Pruebas unitarias a servicios: @Mock o Mockito.mock() vs @MockBean
+
+> Cuando realicemos pruebas a nuestra clase de servicio o componente, lo recomendable sería utilizar lo concerniente a
+> Mockito, ya sea **@Mock** o **Mockito.mock()**, puesto que estos test no levantan ningún contexto de Spring, por lo
+> que su tiempo de ejecución es muy rápido. [Fuente: cloudAppi](https://cloudappi.net/testing-en-spring-boot/)
+
+Mientras que, **@MockBean** anotado en un campo de una clase de prueba, Spring Boot creará automáticamente un
+objeto simulado (mock) de la dependencia correspondiente y lo inyectará en la clase. Esto permite simular el
+comportamiento de la dependencia y definir respuestas predefinidas para los métodos llamados durante la prueba.
+``Generalmente, se usará esta anotación en otras capas de la aplicación, como el controlador.``
