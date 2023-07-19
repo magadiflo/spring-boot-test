@@ -539,3 +539,64 @@ class AccountServiceImplWithMockitoAnnotationsUnitTest {
 
 Y eso es todo, si ejecutamos los test de nuestra nueva clase, veremos que todo seguirá funcionando como antes, pero esta
 vez estamos creando los **Mocks** usando las anotaciones de **Mockito**.
+
+## Pruebas Unitarias para el service AccountServiceImpl - Mockeo con anotaciones de Spring Boot
+
+Creamos una nueva clase de prueba con los mismos test que hemos venido realizando hasta ahora, lo único que cambiará
+serán las anotaciones que usaremos:
+
+````java
+
+@SpringBootTest
+class AccountServiceImplWithSpringBootAnnotationsUnitTest {
+    @MockBean
+    IAccountRepository accountRepository;
+    @MockBean
+    IBankRepository bankRepository;
+    @Autowired
+    IAccountService accountService;
+
+    @Test
+    void canTransferBetweenAccounts() { /* omitted code */ }
+
+    @Test
+    void willThrowExceptionWhenBalanceIsLessThanAmountToBeTransfer() { /* omitted code */ }
+
+    @Test
+    void canVerifyThatTwoInstancesAreTheSame() { /* omitted code */ }
+}
+````
+
+Anteriormente, ya habíamos explicado el uso de la anotación **@SpringBootTest**, donde decíamos que Spring Boot
+proporciona esta anotación para las **pruebas de integración**. Esta anotación crea un contexto para la aplicación y
+carga el contexto completo de la aplicación.
+
+En este caso lo utilizaremos para realizar **pruebas unitarias**, pero más adelante determinaremos que lo mejor para
+realizar pruebas unitarias a servicios y/o componentes será **hacer uso del Mockito.mock() o la anotación @Mock.**
+
+**@MockBean**
+
+Si hacemos uso de la anotación **@SpringBootTest** podemos hacer uso de la anotación de Spring Boot, el **@MockBean**.
+La anotación **@MockBean** agrega objetos simulados al contexto de la aplicación de Spring (**@SpringBootTest crea ese
+contexto para la aplicación**). El objeto mockeado reemplazará a cualquier bean existente del mismo tipo en el contexto
+de la aplicación. Si no se define un bean del mismo tipo, se agregará uno nuevo. **En resumen, cuando utilicemos la
+anotación @MockBean en un campo, el mock se inyectará en el campo, además de registrarse en el contexto de la
+aplicación.**
+
+**@Autowired**
+
+Nos permite inyectar una implementación concreta en la instancia **IAccountService**, pero para eso necesitamos agregar
+a la implementación concreta **AccountServiceImpl** la anotación **@Service**:
+
+````java
+
+@Service
+public class AccountServiceImpl implements IAccountService {
+    /* omitted code */
+}
+````
+
+Listo, si ejecutamos nuestra nueva clase de test **AccountServiceImplWithSpringBootAnnotationsUnitTest** veremos que
+se ejecutará exitosamente, con una observación: **Ahora se está creando un contexto para la aplicación**, es por esa
+razón que cuando ejecutamos el test de dicha clase, vemos que en la consola aparece la presentación clásica de
+Spring Boot.

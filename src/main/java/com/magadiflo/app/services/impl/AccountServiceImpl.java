@@ -5,11 +5,13 @@ import com.magadiflo.app.models.Bank;
 import com.magadiflo.app.repositories.IAccountRepository;
 import com.magadiflo.app.repositories.IBankRepository;
 import com.magadiflo.app.services.IAccountService;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
+@Service
 public class AccountServiceImpl implements IAccountService {
     private final IAccountRepository accountRepository;
     private final IBankRepository bankRepository;
