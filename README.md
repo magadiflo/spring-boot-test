@@ -611,3 +611,109 @@ Mientras que, **@MockBean** anotado en un campo de una clase de prueba, Spring B
 objeto simulado (mock) de la dependencia correspondiente y lo inyectará en la clase. Esto permite simular el
 comportamiento de la dependencia y definir respuestas predefinidas para los métodos llamados durante la prueba.
 ``Generalmente, se usará esta anotación en otras capas de la aplicación, como el controlador.``
+
+# Sección 5: Spring Boot: Test de Repositorios (DataJpaTest)
+
+---
+
+## Configurando el contexto de persistencia JPA y clases entities para test
+
+Necesitamos agregar las dependencias de **h2 y jpa** a nuestro proyecto. Por el momento trabajaremos con una base de
+datos en memoria para realizar los test, posteriormente trabajaré con una base de datos real, tan solo para ver su
+funcionamiento y las configuraciones que se necesitan para eso, pero por el momento trabajaremos con **h2**:
+
+````xml
+
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>com.h2database</groupId>
+        <artifactId>h2</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+````
+
+Ahora, en nuestro directorio **/test** crearemos un subdirectorio llamado **/resources** similar al que tenemos en el
+directorio **/main** y también le agregaremos **application.properties**. Este archivo de propiedades contendrá
+configuraciones relacionadas a las pruebas realizadas en la aplicación.
+
+**NOTA**
+> En IntelliJ IDEA demos click derecho al directorio **/resource** creado y vamos a la opción de **Mark Directory as**,
+> debemos observar que esté con: "Unmark as Test Resources Root". De esa manera confirmamos que dicho directorio **sí
+> esta marcado como raíz de recursos de prueba.**
+
+Configuramos nuestra base de datos **h2** en el **application.properties** de nuestro directorio **/test/resources**:
+
+````properties
+# Datasource
+spring.datasource.url=jdbc:h2://mem:db;DB_CLOSE_DELAY=-1
+spring.datasource.username=sa
+spring.datasource.password=sa
+spring.datasource.driver-class-name=org.h2.Driver
+# Only development
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+````
+
+**NOTA**
+
+> La base de datos **h2** es una base de datos en memoria, solo se necesita agregar la dependencia en el pom.xml e
+> inmediatamente se autoconfigura, es decir no necesitamos agregar configuraciones en el application.properties para que
+> funcione, sino más bien, **por defecto se autoconfigura**, pero también podemos realizar configuraciones
+> personalizadas como habilitar la consola h2 usando esta configuración: **spring.h2.console.enabled=true**, entre
+> otros.
+>
+> **¿y esas configuraciones del datasource que puse en el application.properties?** Son configuraciones que permiten
+> crear un datasource para cualquier base de datos, en este caso usé dichas configuraciones para configurar la base de
+> datos h2 tal como lo hubiera realizado configurando una base de datos real. Pero las puse con la finalidad de que más
+> adelante usaré una base de datos real, entonces solo tendría que cambiar los datos de conexión.
+>
+> **Conclusión:** si solo usaré la base de datos **h2** para realizar las pruebas, tan solo agregando la dependencia de
+> h2 ya estaría configurada el **datasource**, pero si luego usaré una base de datos real para las pruebas, podría usar
+> la configuración que puse para tan solo cambiar los datos de conexión.
+
+Ahora, toca modificar nuestras clases de modelo para **convertirlos en entities (clases de persistencia de hibernate)**:
+
+````java
+
+@Entity
+@Table(name = "accounts")
+public class Account {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String person;
+    private BigDecimal balance;
+    /* constructors, getters, setters, debit, credit, equals, hashCode and toString */
+}
+````
+
+````java
+
+@Entity
+@Table(name = "banks")
+public class Bank {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String name;
+    @Column(name = "total_transfers")
+    private int totalTransfers;
+    /*constructors, getters, setters and toString */
+}
+````
+
+Creamos dentro del **test/resources/** un archivo llamado **import.sql** para poder poblar nuestras tablas con datos de
+prueba:
+
+````sql
+INSERT INTO banks(name, total_transfers) VALUES('Banco de la Nación', 0);
+INSERT INTO accounts(person, balance) VALUES('Martín', 2000);
+INSERT INTO accounts(person, balance) VALUES('Alicia', 1000);
+````

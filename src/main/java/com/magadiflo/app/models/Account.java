@@ -1,11 +1,16 @@
 package com.magadiflo.app.models;
 
 import com.magadiflo.app.exceptions.InsufficientMoneyException;
+import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.util.Objects;
 
+@Entity
+@Table(name = "accounts")
 public class Account {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String person;
     private BigDecimal balance;
