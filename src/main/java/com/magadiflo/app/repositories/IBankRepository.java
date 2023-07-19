@@ -1,14 +1,8 @@
 package com.magadiflo.app.repositories;
 
 import com.magadiflo.app.models.Bank;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
-import java.util.Optional;
+public interface IBankRepository extends JpaRepository<Bank, Long> {
 
-public interface IBankRepository {
-    List<Bank> findAll();
-
-    Optional<Bank> findById(Long id);
-
-    Bank update(Bank bank);
 }

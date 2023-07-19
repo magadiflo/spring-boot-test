@@ -651,7 +651,7 @@ Configuramos nuestra base de datos **h2** en el **application.properties** de nu
 
 ````properties
 # Datasource
-spring.datasource.url=jdbc:h2://mem:db;DB_CLOSE_DELAY=-1
+spring.datasource.url=jdbc:h2:mem:db;DB_CLOSE_DELAY=-1
 spring.datasource.username=sa
 spring.datasource.password=sa
 spring.datasource.driver-class-name=org.h2.Driver
@@ -716,4 +716,57 @@ prueba:
 INSERT INTO banks(name, total_transfers) VALUES('Banco de la Nación', 0);
 INSERT INTO accounts(person, balance) VALUES('Martín', 2000);
 INSERT INTO accounts(person, balance) VALUES('Alicia', 1000);
+````
+
+## Modificando nuestros repositorios con Spring Data JPA
+
+Como ahora utilizaremos Hibernate/JPA con la dependencia de Spring Data JPA modificaremos nuestras interfaces de
+repositorio para extender de las interfaces propias del JPA. Es importante notar que los métodos que teníamos
+inicialmente, los eliminamos, ya que estos vienen dentro de la interfaz **CrudRepository** el cual es extendido por
+**JpaRepository**:
+
+````java
+public interface IBankRepository extends JpaRepository<Bank, Long> {
+
+}
+````
+
+````java
+public interface IAccountRepository extends JpaRepository<Account, Long> {
+
+}
+````
+
+Como eliminamos los métodos que usábamos inicialmente, nuestros test unitarios de la clase de servicio van a fallar, ya
+que ellos están haciendo uso aún de los métodos que creamos inicialmente. Lo que haremos para solucionarlos será ahora
+usar los métodos que jpa nos proporciona:
+
+````java
+class AccountServiceImplUnitTest {
+    void canTransferBetweenAccounts() {
+        /* omitted code */
+        verify(this.accountRepository, times(2)).save(any(Account.class));  //<--se cambió el update por el save
+        verify(this.bankRepository).save(any(Bank.class));                  //<--se cambió el update por el save
+    }
+}
+````
+
+Como observamos, en todos los test solo cambiaremos el **update()** que teníamos inicialmente por al **save()**. El
+mismo cambio aplicamos en la clase de implementación del servicio **AccountServiceImpl**:
+
+````java
+
+@Service
+public class AccountServiceImpl implements IAccountService {
+    /* omitted code */
+
+    @Override
+    public void transfer(Long bankId, Long accountIdOrigen, Long accountIdDestination, BigDecimal amount) {
+        /* omitted code */
+
+        this.accountRepository.save(accountOrigen);         // Cambió el update por el save
+        this.accountRepository.save(accountDestination);    // Cambió el update por el save
+        this.bankRepository.save(bank);                     // Cambió el update por el save
+    }
+}
 ````

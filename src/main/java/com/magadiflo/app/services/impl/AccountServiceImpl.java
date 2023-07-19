@@ -55,8 +55,8 @@ public class AccountServiceImpl implements IAccountService {
 
         bank.setTotalTransfers(bank.getTotalTransfers() + 1);
 
-        this.accountRepository.update(accountOrigen);
-        this.accountRepository.update(accountDestination);
-        this.bankRepository.update(bank);
+        this.accountRepository.save(accountOrigen);
+        this.accountRepository.save(accountDestination);
+        this.bankRepository.save(bank);
     }
 }

@@ -55,10 +55,10 @@ class AccountServiceImplWithSpringBootAnnotationsUnitTest {
 
         verify(this.accountRepository, times(3)).findById(accountIdOrigen);
         verify(this.accountRepository, times(3)).findById(accountIdDestination);
-        verify(this.accountRepository, times(2)).update(any(Account.class));
+        verify(this.accountRepository, times(2)).save(any(Account.class));
 
         verify(this.bankRepository, times(2)).findById(bankId);
-        verify(this.bankRepository).update(any(Bank.class));
+        verify(this.bankRepository).save(any(Bank.class));
     }
 
     @Test
@@ -94,10 +94,10 @@ class AccountServiceImplWithSpringBootAnnotationsUnitTest {
 
         verify(this.accountRepository, times(3)).findById(accountIdOrigen);
         verify(this.accountRepository, times(3)).findById(accountIdDestination);
-        verify(this.accountRepository, never()).update(any(Account.class));
+        verify(this.accountRepository, never()).save(any(Account.class));
 
         verify(this.bankRepository, times(1)).findById(bankId);
-        verify(this.bankRepository, never()).update(any(Bank.class));
+        verify(this.bankRepository, never()).save(any(Bank.class));
     }
 
     @Test
