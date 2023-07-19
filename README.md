@@ -770,3 +770,20 @@ public class AccountServiceImpl implements IAccountService {
     }
 }
 ````
+
+## Agregando consulta personalizada en el repositorio de cuenta con Spring Data JPA
+
+Agregaremos dos consultas personalizadas en el repositorio de cuentas:
+
+````java
+public interface IAccountRepository extends JpaRepository<Account, Long> {
+    Optional<Account> findByPerson(String person);
+
+    @Query(value = "SELECT a FROM Account AS a WHERE a.person = ?1")
+    Optional<Account> findAccountByPerson(String person);
+}
+````
+
+Si observamos ambas consultas definidas hacen lo mismo, la diferencia está en la forma cómo se construyen, mientras que
+la primera consulta usa el **nombre del método** como palabras claves para realizar la consulta, la segunda forma usa
+la anotación **@Query**, donde definimos manualmente una consulta JPQL.
