@@ -1,8 +1,15 @@
 package com.magadiflo.app.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "banks")
 public class Bank {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String name;
+    @Column(name = "total_transfers")
     private int totalTransfers;
 
     public Bank() {
