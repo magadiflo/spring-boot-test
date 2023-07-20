@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,5 +46,16 @@ class AccountRepositoryIntegrationTest {
         List<Account> accounts = this.accountRepository.findAll();
         assertFalse(accounts.isEmpty());
         assertEquals(2, accounts.size());
+    }
+
+    @Test
+    void should_save_an_account() {
+        Account account = new Account(null, "Are", new BigDecimal("1500"));
+
+        Account accountDB = this.accountRepository.save(account);
+
+        assertNotNull(accountDB.getId());
+        assertEquals("Are", accountDB.getPerson());
+        assertEquals(1500D, accountDB.getBalance().doubleValue());
     }
 }

@@ -902,3 +902,25 @@ class AccountRepositoryIntegrationTest {
 Como resultado observamos que los tests se ejecutan correctamente:
 
 ![prueba-de-integracion.png](./assets/prueba-de-integracion.png)
+
+## Escribiendo pruebas para el save
+
+````java
+
+@DataJpaTest
+class AccountRepositoryIntegrationTest {
+    @Autowired
+    private IAccountRepository accountRepository;
+
+    @Test
+    void should_save_an_account() {
+        Account account = new Account(null, "Are", new BigDecimal("1500"));
+
+        Account accountDB = this.accountRepository.save(account);
+
+        assertNotNull(accountDB.getId());
+        assertEquals("Are", accountDB.getPerson());
+        assertEquals(1500D, accountDB.getBalance().doubleValue());
+    }
+}
+````
