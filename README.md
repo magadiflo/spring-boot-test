@@ -1162,3 +1162,76 @@ public class AccountServiceImpl implements IAccountService {
 > que no hay necesidad de persistir cambios en la base de datos. Pero si estando el método anotado con readOnly = true,
 > se intenta realizar operaciones de escritura, se producirá una excepción en tiempo de ejecución.
 
+## Configurando Swagger
+
+Usaré la dependencia que se usa en el tutorial:
+[Spring Boot 3 + Swagger: Documentando una API REST desde cero,](https://www.youtube.com/watch?v=-SzKqwgPTyk)
+ya que esta dependencia incluye varias características, tanto la especificación de **OpenAPI** y el **Swagger-UI** para
+Spring Boot 3 entre otras
+([Ver artículo del mismo tutorial para más información](https://sacavix.com/2023/03/spring-boot-3-spring-doc-swagger-un-ejemplo/)):
+
+La documentación la podemos encontrar en: **[https://springdoc.org/](https://springdoc.org/)**:
+
+````xml
+<!-- https://springdoc.org/  -->
+<dependencies>
+    <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>2.1.0</version>
+    </dependency>
+</dependencies>
+````
+
+**IMPORTANTE**
+
+- Tan solo agregando la dependencia anterior **(sin configuración adicional)** nuestra aplicación de Spring Boot queda
+  configurado con swagger-ui.
+- La página de la interfaz de usuario de Swagger estará disponible en: ``http://localhost:8080/swagger-ui/index.html``
+- La descripción de OpenAPI estará disponible en la siguiente URL para el formato
+  json: ``http://localhost:8080/v3/api-docs``
+
+**DATO**
+
+- **OpenAPI** es una especificación. Es una especificación independiente del lenguaje que sirve para describir API REST.
+  Es una serie de reglas, especificaciones y herramientas que nos ayudan a documentar nuestras APIs.
+- **Swagger** es una herramienta que usa la especificación OpenAPI. Por ejemplo, OpenAPIGenerator y **SwaggerUI.**
+
+## Configurando Base de datos MySQL
+
+Como en nuestras dependencias ya tenemos agregado el conector a **MySQL**, agregaremos los datos de conexión a la base
+de datos en el application.properties, ya que antes de hacer los tests, necesitamos verificar que la aplicación esté
+funcionando. Recordar que también tenemos la dependencia de **h2**, pero esta dependencia la estamos usando para hacer
+los test, mientras que la dependencia de **MySQL** lo usaremos para hacer funcionar nuestra aplicación, con nuestro
+código fuente real.
+
+``src/main/resources/application.properties``
+
+````properties
+# Datasource
+spring.datasource.url=jdbc:mysql://localhost:3306/db_spring_boot_test?serverTimezone=America/Lima
+spring.datasource.username=root
+spring.datasource.password=magadiflo
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+# Only development
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+````
+
+Creamos un archivo **import.sql** en la misma ruta del application.properties anterior:
+
+``src/main/resources/import.sql``
+
+````sql
+INSERT INTO banks(name, total_transfers) VALUES('Banco de Crédito', 0);
+INSERT INTO banks(name, total_transfers) VALUES('Banco Interbank', 0);
+INSERT INTO banks(name, total_transfers) VALUES('Banco Scotiabank', 0);
+INSERT INTO banks(name, total_transfers) VALUES('Banco BBVA', 0);
+
+INSERT INTO accounts(person, balance) VALUES('Karen', 500);
+INSERT INTO accounts(person, balance) VALUES('Miluska', 1500);
+INSERT INTO accounts(person, balance) VALUES('Rosa', 750.50);
+INSERT INTO accounts(person, balance) VALUES('Santiago', 260.30);
+INSERT INTO accounts(person, balance) VALUES('Franz', 145.60);
+````
