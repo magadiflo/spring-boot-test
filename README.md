@@ -611,3 +611,433 @@ Mientras que, **@MockBean** anotado en un campo de una clase de prueba, Spring B
 objeto simulado (mock) de la dependencia correspondiente y lo inyectará en la clase. Esto permite simular el
 comportamiento de la dependencia y definir respuestas predefinidas para los métodos llamados durante la prueba.
 ``Generalmente, se usará esta anotación en otras capas de la aplicación, como el controlador.``
+
+# Sección 5: Spring Boot: Test de Repositorios (DataJpaTest)
+
+---
+
+## Configurando el contexto de persistencia JPA y clases entities para test
+
+Necesitamos agregar las dependencias de **h2 y jpa** a nuestro proyecto. Por el momento trabajaremos con una base de
+datos en memoria para realizar los test, posteriormente trabajaré con una base de datos real, tan solo para ver su
+funcionamiento y las configuraciones que se necesitan para eso, pero por el momento trabajaremos con **h2**:
+
+````xml
+
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>com.h2database</groupId>
+        <artifactId>h2</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+````
+
+Ahora, en nuestro directorio **/test** crearemos un subdirectorio llamado **/resources** similar al que tenemos en el
+directorio **/main** y también le agregaremos **application.properties**. Este archivo de propiedades contendrá
+configuraciones relacionadas a las pruebas realizadas en la aplicación.
+
+**NOTA**
+> En IntelliJ IDEA demos click derecho al directorio **/resource** creado y vamos a la opción de **Mark Directory as**,
+> debemos observar que esté con: "Unmark as Test Resources Root". De esa manera confirmamos que dicho directorio **sí
+> esta marcado como raíz de recursos de prueba.**
+
+Configuramos nuestra base de datos **h2** en el **application.properties** de nuestro directorio **/test/resources**:
+
+````properties
+# Datasource
+spring.datasource.url=jdbc:h2:mem:db;DB_CLOSE_DELAY=-1
+spring.datasource.username=sa
+spring.datasource.password=sa
+spring.datasource.driver-class-name=org.h2.Driver
+# Only development
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+````
+
+**NOTA**
+
+> La base de datos **h2** es una base de datos en memoria, solo se necesita agregar la dependencia en el pom.xml e
+> inmediatamente se autoconfigura, es decir no necesitamos agregar configuraciones en el application.properties para que
+> funcione, sino más bien, **por defecto se autoconfigura**, pero también podemos realizar configuraciones
+> personalizadas como habilitar la consola h2 usando esta configuración: **spring.h2.console.enabled=true**, entre
+> otros.
+>
+> **¿y esas configuraciones del datasource que puse en el application.properties?** Son configuraciones que permiten
+> crear un datasource para cualquier base de datos, en este caso usé dichas configuraciones para configurar la base de
+> datos h2 tal como lo hubiera realizado configurando una base de datos real. Pero las puse con la finalidad de que más
+> adelante usaré una base de datos real, entonces solo tendría que cambiar los datos de conexión.
+>
+> **Conclusión:** si solo usaré la base de datos **h2** para realizar las pruebas, tan solo agregando la dependencia de
+> h2 ya estaría configurada el **datasource**, pero si luego usaré una base de datos real para las pruebas, podría usar
+> la configuración que puse para tan solo cambiar los datos de conexión.
+
+Ahora, toca modificar nuestras clases de modelo para **convertirlos en entities (clases de persistencia de hibernate)**:
+
+````java
+
+@Entity
+@Table(name = "accounts")
+public class Account {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String person;
+    private BigDecimal balance;
+    /* constructors, getters, setters, debit, credit, equals, hashCode and toString */
+}
+````
+
+````java
+
+@Entity
+@Table(name = "banks")
+public class Bank {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String name;
+    @Column(name = "total_transfers")
+    private int totalTransfers;
+    /*constructors, getters, setters and toString */
+}
+````
+
+Creamos dentro del **test/resources/** un archivo llamado **import.sql** para poder poblar nuestras tablas con datos de
+prueba:
+
+````sql
+INSERT INTO banks(name, total_transfers) VALUES('Banco de la Nación', 0);
+INSERT INTO accounts(person, balance) VALUES('Martín', 2000);
+INSERT INTO accounts(person, balance) VALUES('Alicia', 1000);
+````
+
+## Modificando nuestros repositorios con Spring Data JPA
+
+Como ahora utilizaremos Hibernate/JPA con la dependencia de Spring Data JPA modificaremos nuestras interfaces de
+repositorio para extender de las interfaces propias del JPA. Es importante notar que los métodos que teníamos
+inicialmente, los eliminamos, ya que estos vienen dentro de la interfaz **CrudRepository** el cual es extendido por
+**JpaRepository**:
+
+````java
+public interface IBankRepository extends JpaRepository<Bank, Long> {
+
+}
+````
+
+````java
+public interface IAccountRepository extends JpaRepository<Account, Long> {
+
+}
+````
+
+Como eliminamos los métodos que usábamos inicialmente, nuestros test unitarios de la clase de servicio van a fallar, ya
+que ellos están haciendo uso aún de los métodos que creamos inicialmente. Lo que haremos para solucionarlos será ahora
+usar los métodos que jpa nos proporciona:
+
+````java
+class AccountServiceImplUnitTest {
+    void canTransferBetweenAccounts() {
+        /* omitted code */
+        verify(this.accountRepository, times(2)).save(any(Account.class));  //<--se cambió el update por el save
+        verify(this.bankRepository).save(any(Bank.class));                  //<--se cambió el update por el save
+    }
+}
+````
+
+Como observamos, en todos los test solo cambiaremos el **update()** que teníamos inicialmente por al **save()**. El
+mismo cambio aplicamos en la clase de implementación del servicio **AccountServiceImpl**:
+
+````java
+
+@Service
+public class AccountServiceImpl implements IAccountService {
+    /* omitted code */
+
+    @Override
+    public void transfer(Long bankId, Long accountIdOrigen, Long accountIdDestination, BigDecimal amount) {
+        /* omitted code */
+
+        this.accountRepository.save(accountOrigen);         // Cambió el update por el save
+        this.accountRepository.save(accountDestination);    // Cambió el update por el save
+        this.bankRepository.save(bank);                     // Cambió el update por el save
+    }
+}
+````
+
+## Agregando consulta personalizada en el repositorio de cuenta con Spring Data JPA
+
+Agregaremos dos consultas personalizadas en el repositorio de cuentas:
+
+````java
+public interface IAccountRepository extends JpaRepository<Account, Long> {
+    Optional<Account> findByPerson(String person);
+
+    @Query(value = "SELECT a FROM Account AS a WHERE a.person = ?1")
+    Optional<Account> findAccountByPerson(String person);
+}
+````
+
+Si observamos ambas consultas definidas hacen lo mismo, la diferencia está en la forma cómo se construyen, mientras que
+la primera consulta usa el **nombre del método** como palabras claves para realizar la consulta, la segunda forma usa
+la anotación **@Query**, donde definimos manualmente una consulta JPQL.
+
+## Pruebas de Integración con @DataJpaTest
+
+Antes de continuar, mencionaré el **por qué** se llama **Prueba de Integración** al usar la anotación **@DataJpaTest**
+y no **Prueba Unitaria**. Recordemos que en el tutorial de **Amigoscode** de test con Spring Boot se usa también esta
+anotación para testear el repositorio, pero **solo para testear los métodos que nosotros agreguemos a la interfaz**,
+a esa acción el tutor lo llama prueba unitaria del repositorio.
+
+**[Fuente: stack overflow](https://stackoverflow.com/questions/23435937/how-to-test-spring-data-repositories)**
+
+> Para abreviar, no hay forma de realizar pruebas unitarias de los repositorios Spring Data JPA razonablemente por una
+> razón simple: es demasiado engorroso simular todas las partes de la API JPA que invocamos para arrancar los
+> repositorios. De todos modos, las pruebas unitarias no tienen mucho sentido aquí, ya que normalmente no está
+> escribiendo ningún código de implementación usted mismo, **por lo que las pruebas de integración son el enfoque más
+razonable.**
+>
+> Si lo piensa, **no hay código que escriba para sus repositorios, por lo que no hay necesidad de escribir pruebas
+> unitarias.** Simplemente, no hay necesidad de hacerlo, ya que puede confiar en nuestra base de prueba para detectar
+> errores básicos. Sin embargo, definitivamente **se necesitan pruebas de integración** para probar dos aspectos de su
+> capa de persistencia, porque son los aspectos relacionados con su dominio:
+>
+> * Entity mappings
+> * Query semantics
+
+Puedo añadir además, que cuando hablamos de **Pruebas Unitarias** nos referimos a la verificación o comprobación del
+correcto funcionamiento de las **piezas de código de manera individual, en forma aislada.** Mientras que, una
+**Prueba de integración** se realiza para verificar la **interacción entre distintos módulos,** y si recordamos nosotros
+agregamos una dependencia para usar base de datos, es decir, las pruebas que haremos **interactuarán con un módulo de
+base de datos**, por lo tanto, podemos decir que las pruebas a crear serán **Pruebas de integración**.
+
+### [La anotación @DataJpaTest](https://docs.spring.io/spring-boot/docs/1.5.2.RELEASE/reference/html/boot-features-testing.html)
+
+**@DataJpaTest** se puede usar si desea probar aplicaciones JPA. De forma predeterminada, configurará una base de datos
+incrustada en memoria, buscará clases @Entity y configurará repositorios de Spring Data JPA, es decir que **solo probará
+los componentes de la capa de repositorio/persistencia.**
+
+La anotación **@DataJpaTest** no cargará los otros beans en el ApplicationContext: **@Component, @Controller, @Service y
+beans anotados.**
+
+La anotación **@DataJpaTest** habilita la configuración específica de JPA para la prueba y se **utilizan las inyecciones
+de dependencia para acceder a los componentes de JPA (repositorios) que se desean probar.**
+
+Los **datos de prueba de JPA son transaccionales** y **retroceden al final de cada prueba de forma predeterminada.** Es
+decir, cada método de prueba anotado con @DataJpaTest se ejecutará dentro de una transacción, y al final de cada prueba,
+la transacción se revertirá automáticamente, evitando así que los cambios de la prueba afecten la base de datos.
+
+> Esto se diferencia de las pruebas unitarias, donde se aísla una unidad de código (como un método o clase) y se prueban
+> sus funcionalidades de forma independiente, **sin depender de clases externas o bases de datos.**
+
+**IMPORTANTE**
+
+> **Únicamente deberíamos probar los métodos que nosotros creemos (los métodos personalizados para hacer consultas a la
+> bd)**. Obviamente, como extendemos de alguna interfaz de Spring Data Jpa, tendremos muchos métodos, como el: save(),
+> findById(), findAll(), etc... pero dichos métodos son métodos que ya vienen probados, puesto que nos lo proporciona
+> Spring Data Jpa.
+>
+> Por tema de aprendizaje, en este curso probamos los métodos propios de las interfaces de Spring Data Jpa.
+
+## Creando nuestra prueba de Integración con @DataJpaTest
+
+Probaremos nuestro repositorio **IAccountRepository**, para ello nos posicionamos en el repositorio y presionamos
+``Ctrl + Shift + T``, le llamaremos: **AccountRepositoryIntegrationTest**:
+
+````java
+
+@DataJpaTest                                        // (1)
+class AccountRepositoryIntegrationTest {
+    @Autowired
+    private IAccountRepository accountRepository;   // (2)
+
+    @Test
+    void should_find_an_account_by_id() {
+        Optional<Account> account = this.accountRepository.findById(1L);
+
+        assertTrue(account.isPresent());
+        assertEquals("Martín", account.get().getPerson());
+    }
+
+    @Test
+    void should_find_an_account_by_person() {
+        Optional<Account> account = this.accountRepository.findAccountByPerson("Martín");
+
+        assertTrue(account.isPresent());
+        assertEquals("Martín", account.get().getPerson());
+        assertEquals(2000D, account.get().getBalance().doubleValue());
+    }
+
+    @Test
+    void should_not_find_an_account_by_person_that_does_not_exist() {
+        Optional<Account> account = this.accountRepository.findAccountByPerson("Pepito");
+
+        assertTrue(account.isEmpty());
+    }
+
+    @Test
+    void should_find_all_accounts() {
+        List<Account> accounts = this.accountRepository.findAll();
+        assertFalse(accounts.isEmpty());
+        assertEquals(2, accounts.size());
+    }
+}
+````
+
+**DONDE**
+
+- **(1)** la anotación @DataJpaTest que nos permite realizar pruebas a nuestros repositorios de JPA.
+- **(2)** realizamos la inyección de dependencia de nuestro repositorio a probar. Esto es posible gracias a la anotación
+  @DataJpaTest.
+- Por defecto, gracias a la anotación @DataJpaTest, **cada método @Test es transaccional**, es decir, apenas termine la
+  ejecución de un método test, automáticamente se hace un rollback de los datos para que se lleve a cabo la ejecución
+  del siguiente test.
+
+Como resultado observamos que los tests se ejecutan correctamente:
+
+![prueba-de-integracion.png](./assets/prueba-de-integracion.png)
+
+## Escribiendo pruebas para el save
+
+````java
+
+@DataJpaTest
+class AccountRepositoryIntegrationTest {
+    @Autowired
+    private IAccountRepository accountRepository;
+
+    @Test
+    void should_save_an_account() {
+        Account account = new Account(null, "Are", new BigDecimal("1500"));
+
+        Account accountDB = this.accountRepository.save(account);
+
+        assertNotNull(accountDB.getId());
+        assertEquals("Are", accountDB.getPerson());
+        assertEquals(1500D, accountDB.getBalance().doubleValue());
+    }
+}
+````
+
+## Escribiendo pruebas para el update y el delete
+
+````java
+
+@DataJpaTest
+class AccountRepositoryIntegrationTest {
+    @Autowired
+    private IAccountRepository accountRepository;
+
+    @Test
+    void should_update_an_account() {
+        Account account = new Account(null, "Are", new BigDecimal("1500"));
+
+        Account accountDB = this.accountRepository.save(account);
+
+        assertNotNull(accountDB.getId());
+        assertEquals("Are", accountDB.getPerson());
+        assertEquals(1500D, accountDB.getBalance().doubleValue());
+
+        accountDB.setBalance(new BigDecimal("3800"));
+        accountDB.setPerson("Karen Caldas");
+
+        Account accountUpdated = this.accountRepository.save(accountDB);
+
+        assertEquals(accountDB.getId(), accountUpdated.getId());
+        assertEquals("Karen Caldas", accountUpdated.getPerson());
+        assertEquals(3800D, accountUpdated.getBalance().doubleValue());
+    }
+
+    @Test
+    void should_delete_an_account() {
+        Optional<Account> accountDB = this.accountRepository.findById(1L);
+        assertTrue(accountDB.isPresent());
+
+        this.accountRepository.delete(accountDB.get());
+
+        Optional<Account> accountDelete = this.accountRepository.findById(1L);
+        assertTrue(accountDelete.isEmpty());
+    }
+}
+````
+
+**NOTA**
+
+- Es importante volver a recalcar que cuando usamos la anotación **@DataJpaTest cada método test es transaccional**, eso
+  significa que **hará rollback una vez finalice el método test**, de esa manera los datos vuelven a su estado original
+  para dar paso al siguiente método test.
+- Para comprobar el punto anterior, observemos la imagen inferior, vemos que el método test que se ejecuta primero es el
+  **should_delete_an_account()** donde eliminamos el registro con id = 1L, pero luego en los otros métodos test estamos
+  haciendo uso del registro con id = 1L y no estamos evidenciando problema alguno, eso es gracias a que los métodos son
+  transaccionales y se está aplicando rollback de manera automática.
+
+  ![rollback](./assets/rollback.png)
+
+## Pruebas de Integración con @DataJpaTest usando MySQL
+
+Primero debemos agregar el conector para mysql en el pom.xml:
+
+````xml
+
+<dependencies>
+    <dependency>
+        <groupId>com.mysql</groupId>
+        <artifactId>mysql-connector-j</artifactId>
+        <scope>runtime</scope>
+    </dependency>
+</dependencies>
+````
+
+En nuestro **application.properties** del directorio **/test/resources/** agregamos los datos de conexión a nuestra
+base de datos de MySQL. Lo agregamos aquí, ya que estaremos simulando que MySQL será nuestra base de datos real para
+pruebas.
+
+````properties
+# Datasource
+spring.datasource.url=jdbc:mysql://localhost:3306/db_spring_boot_test?serverTimezone=America/Lima
+spring.datasource.username=root
+spring.datasource.password=magadiflo
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+# Only development
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+````
+
+**NOTA**
+
+> Como dijimos en un apartado superior, ahora solo reemplazamos los datos de nuestra base de datos real (MySQL).
+> Anteriormente, usamos la misma configuración, pero con los datos de la base de datos en memoria **h2**.
+
+Finalmente, a nuestra clase de prueba le agregamos una segunda anotación: **@AutoConfigureTestDatabase()**:
+
+````java
+
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class AccountRepositoryIntegrationTest {
+    @Autowired
+    private IAccountRepository accountRepository;
+
+    @Test
+    void should_find_an_account_by_id() { /* omitted code */ }
+
+    /* other tests */
+}
+````
+
+La anotación **@AutoConfigureTestDatabase** la usamos cuando queremos ejecutar las pruebas en una base de datos real.
+Al usar **replace = AutoConfigureTestDatabase.Replace.NONE**, le estamos indicando a Spring Boot que no reemplace la
+configuración de la base de datos existente, lo que significa que utilizará la base de datos real configurada en tu
+aplicación.
+
+A continuación vemos la ejecución de nuestras pruebas, pero esta vez usando MySQL.
+![prueba-integracion-mysql.png](./assets/prueba-integracion-mysql.png)
+
+``Listo, ahora para continuar con el curso, dejaré configurado con la base de datos en memoria h2.``
