@@ -787,3 +787,118 @@ public interface IAccountRepository extends JpaRepository<Account, Long> {
 Si observamos ambas consultas definidas hacen lo mismo, la diferencia está en la forma cómo se construyen, mientras que
 la primera consulta usa el **nombre del método** como palabras claves para realizar la consulta, la segunda forma usa
 la anotación **@Query**, donde definimos manualmente una consulta JPQL.
+
+## Pruebas de Integración con @DataJpaTest
+
+Antes de continuar, mencionaré el **por qué** se llama **Prueba de Integración** al usar la anotación **@DataJpaTest**
+y no **Prueba Unitaria**. Recordemos que en el tutorial de **Amigoscode** de test con Spring Boot se usa también esta
+anotación para testear el repositorio, pero **solo para testear los métodos que nosotros agreguemos a la interfaz**,
+a esa acción el tutor lo llama prueba unitaria del repositorio.
+
+**[Fuente: stack overflow](https://stackoverflow.com/questions/23435937/how-to-test-spring-data-repositories)**
+
+> Para abreviar, no hay forma de realizar pruebas unitarias de los repositorios Spring Data JPA razonablemente por una
+> razón simple: es demasiado engorroso simular todas las partes de la API JPA que invocamos para arrancar los
+> repositorios. De todos modos, las pruebas unitarias no tienen mucho sentido aquí, ya que normalmente no está
+> escribiendo ningún código de implementación usted mismo, **por lo que las pruebas de integración son el enfoque más
+razonable.**
+>
+> Si lo piensa, **no hay código que escriba para sus repositorios, por lo que no hay necesidad de escribir pruebas
+> unitarias.** Simplemente, no hay necesidad de hacerlo, ya que puede confiar en nuestra base de prueba para detectar
+> errores básicos. Sin embargo, definitivamente **se necesitan pruebas de integración** para probar dos aspectos de su
+> capa de persistencia, porque son los aspectos relacionados con su dominio:
+>
+> * Entity mappings
+> * Query semantics
+
+Puedo añadir además, que cuando hablamos de **Pruebas Unitarias** nos referimos a la verificación o comprobación del
+correcto funcionamiento de las **piezas de código de manera individual, en forma aislada.** Mientras que, una
+**Prueba de integración** se realiza para verificar la **interacción entre distintos módulos,** y si recordamos nosotros
+agregamos una dependencia para usar base de datos, es decir, las pruebas que haremos **interactuarán con un módulo de
+base de datos**, por lo tanto, podemos decir que las pruebas a crear serán **Pruebas de integración**.
+
+### [La anotación @DataJpaTest](https://docs.spring.io/spring-boot/docs/1.5.2.RELEASE/reference/html/boot-features-testing.html)
+
+**@DataJpaTest** se puede usar si desea probar aplicaciones JPA. De forma predeterminada, configurará una base de datos
+incrustada en memoria, buscará clases @Entity y configurará repositorios de Spring Data JPA, es decir que **solo probará
+los componentes de la capa de repositorio/persistencia.**
+
+La anotación **@DataJpaTest** no cargará los otros beans en el ApplicationContext: **@Component, @Controller, @Service y
+beans anotados.**
+
+La anotación **@DataJpaTest** habilita la configuración específica de JPA para la prueba y se **utilizan las inyecciones
+de dependencia para acceder a los componentes de JPA (repositorios) que se desean probar.**
+
+Los **datos de prueba de JPA son transaccionales** y **retroceden al final de cada prueba de forma predeterminada.** Es
+decir, cada método de prueba anotado con @DataJpaTest se ejecutará dentro de una transacción, y al final de cada prueba,
+la transacción se revertirá automáticamente, evitando así que los cambios de la prueba afecten la base de datos.
+
+> Esto se diferencia de las pruebas unitarias, donde se aísla una unidad de código (como un método o clase) y se prueban
+> sus funcionalidades de forma independiente, **sin depender de clases externas o bases de datos.**
+
+**IMPORTANTE**
+
+> **Únicamente deberíamos probar los métodos que nosotros creemos (los métodos personalizados para hacer consultas a la
+> bd)**. Obviamente, como extendemos de alguna interfaz de Spring Data Jpa, tendremos muchos métodos, como el: save(),
+> findById(), findAll(), etc... pero dichos métodos son métodos que ya vienen probados, puesto que nos lo proporciona
+> Spring Data Jpa.
+>
+> Por tema de aprendizaje, en este curso probamos los métodos propios de las interfaces de Spring Data Jpa.
+
+## Creando nuestra prueba de Integración con @DataJpaTest
+
+Probaremos nuestro repositorio **IAccountRepository**, para ello nos posicionamos en el repositorio y presionamos
+``Ctrl + Shift + T``, le llamaremos: **AccountRepositoryIntegrationTest**:
+
+````java
+
+@DataJpaTest                                        // (1)
+class AccountRepositoryIntegrationTest {
+    @Autowired
+    private IAccountRepository accountRepository;   // (2)
+
+    @Test
+    void should_find_an_account_by_id() {
+        Optional<Account> account = this.accountRepository.findById(1L);
+
+        assertTrue(account.isPresent());
+        assertEquals("Martín", account.get().getPerson());
+    }
+
+    @Test
+    void should_find_an_account_by_person() {
+        Optional<Account> account = this.accountRepository.findAccountByPerson("Martín");
+
+        assertTrue(account.isPresent());
+        assertEquals("Martín", account.get().getPerson());
+        assertEquals(2000D, account.get().getBalance().doubleValue());
+    }
+
+    @Test
+    void should_not_find_an_account_by_person_that_does_not_exist() {
+        Optional<Account> account = this.accountRepository.findAccountByPerson("Pepito");
+
+        assertTrue(account.isEmpty());
+    }
+
+    @Test
+    void should_find_all_accounts() {
+        List<Account> accounts = this.accountRepository.findAll();
+        assertFalse(accounts.isEmpty());
+        assertEquals(2, accounts.size());
+    }
+}
+````
+
+**DONDE**
+
+- **(1)** la anotación @DataJpaTest que nos permite realizar pruebas a nuestros repositorios de JPA.
+- **(2)** realizamos la inyección de dependencia de nuestro repositorio a probar. Esto es posible gracias a la anotación
+  @DataJpaTest.
+- Por defecto, gracias a la anotación @DataJpaTest, **cada método @Test es transaccional**, es decir, apenas termine la
+  ejecución de un método test, automáticamente se hace un rollback de los datos para que se lleve a cabo la ejecución
+  del siguiente test.
+
+Como resultado observamos que los tests se ejecutan correctamente:
+
+![prueba-de-integracion.png](./assets/prueba-de-integracion.png)
