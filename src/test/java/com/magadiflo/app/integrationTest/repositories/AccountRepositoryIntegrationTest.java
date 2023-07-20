@@ -58,4 +58,35 @@ class AccountRepositoryIntegrationTest {
         assertEquals("Are", accountDB.getPerson());
         assertEquals(1500D, accountDB.getBalance().doubleValue());
     }
+
+    @Test
+    void should_update_an_account() {
+        Account account = new Account(null, "Are", new BigDecimal("1500"));
+
+        Account accountDB = this.accountRepository.save(account);
+
+        assertNotNull(accountDB.getId());
+        assertEquals("Are", accountDB.getPerson());
+        assertEquals(1500D, accountDB.getBalance().doubleValue());
+
+        accountDB.setBalance(new BigDecimal("3800"));
+        accountDB.setPerson("Karen Caldas");
+
+        Account accountUpdated = this.accountRepository.save(accountDB);
+
+        assertEquals(accountDB.getId(), accountUpdated.getId());
+        assertEquals("Karen Caldas", accountUpdated.getPerson());
+        assertEquals(3800D, accountUpdated.getBalance().doubleValue());
+    }
+
+    @Test
+    void should_delete_an_account() {
+        Optional<Account> accountDB = this.accountRepository.findById(1L);
+        assertTrue(accountDB.isPresent());
+
+        this.accountRepository.delete(accountDB.get());
+
+        Optional<Account> accountDelete = this.accountRepository.findById(1L);
+        assertTrue(accountDelete.isEmpty());
+    }
 }

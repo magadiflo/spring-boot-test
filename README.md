@@ -924,3 +924,57 @@ class AccountRepositoryIntegrationTest {
     }
 }
 ````
+
+## Escribiendo pruebas para el update y el delete
+
+````java
+
+@DataJpaTest
+class AccountRepositoryIntegrationTest {
+    @Autowired
+    private IAccountRepository accountRepository;
+
+    @Test
+    void should_update_an_account() {
+        Account account = new Account(null, "Are", new BigDecimal("1500"));
+
+        Account accountDB = this.accountRepository.save(account);
+
+        assertNotNull(accountDB.getId());
+        assertEquals("Are", accountDB.getPerson());
+        assertEquals(1500D, accountDB.getBalance().doubleValue());
+
+        accountDB.setBalance(new BigDecimal("3800"));
+        accountDB.setPerson("Karen Caldas");
+
+        Account accountUpdated = this.accountRepository.save(accountDB);
+
+        assertEquals(accountDB.getId(), accountUpdated.getId());
+        assertEquals("Karen Caldas", accountUpdated.getPerson());
+        assertEquals(3800D, accountUpdated.getBalance().doubleValue());
+    }
+
+    @Test
+    void should_delete_an_account() {
+        Optional<Account> accountDB = this.accountRepository.findById(1L);
+        assertTrue(accountDB.isPresent());
+
+        this.accountRepository.delete(accountDB.get());
+
+        Optional<Account> accountDelete = this.accountRepository.findById(1L);
+        assertTrue(accountDelete.isEmpty());
+    }
+}
+````
+
+**NOTA**
+
+- Es importante volver a recalcar que cuando usamos la anotación **@DataJpaTest cada método test es transaccional**, eso
+  significa que **hará rollback una vez finalice el método test**, de esa manera los datos vuelven a su estado original
+  para dar paso al siguiente método test.
+- Para comprobar el punto anterior, observemos la imagen inferior, vemos que el método test que se ejecuta primero es el
+  **should_delete_an_account()** donde eliminamos el registro con id = 1L, pero luego en los otros métodos test estamos
+  haciendo uso del registro con id = 1L y no estamos evidenciando problema alguno, eso es gracias a que los métodos son
+  transaccionales y se está aplicando rollback de manera automática.
+
+  ![rollback](./assets/rollback.png)
