@@ -1341,3 +1341,53 @@ class AccountControllerUnitTest {
 Como observamos en el código anterior, he creado dos pruebas unitarias donde se refleja un **escenario positivo** y un
 **escenario negativo** al hacer una petición a la url ``/api/v1/accounts/{id}`` enviándole un id existente y un id que
 no existe.
+
+## Escribiendo pruebas para el controlador parte 2
+
+Crearemos la prueba unitaria para nuestro endpoint **/api/v1/accounts/transfer**. Al ser un método post, estamos
+enviándole información por el cuerpo de la petición, por lo tanto requerimos convertir el dto en un objeto json, aquí
+entra el uso de nuestro objeto **ObjectMapper**:
+
+````java
+
+@WebMvcTest(AccountController.class)
+class AccountControllerUnitTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @MockBean
+    private IAccountService accountService;
+
+    /* omitted other tests */
+
+    @Test
+    void should_transfer_an_amount_between_accounts() throws Exception {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("100"));
+        doNothing().when(this.accountService).transfer(dto.bankId(), dto.accountIdOrigin(), dto.accountIdDestination(), dto.amount());
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/accounts/transfer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(this.objectMapper.writeValueAsString(dto)));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.code").value(HttpStatus.OK.value()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.datetime").exists())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("transferencia exitosa"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.transaction.accountIdOrigin").value(dto.accountIdOrigin()));
+
+        String jsonResponse = response.andReturn().getResponse().getContentAsString();
+        JsonNode jsonNode = this.objectMapper.readTree(jsonResponse);
+
+        String dateTime = jsonNode.get("datetime").asText();
+        LocalDateTime localDateTime = LocalDateTime.parse(dateTime);
+
+        assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+    }
+}
+````
