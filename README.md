@@ -978,3 +978,66 @@ class AccountRepositoryIntegrationTest {
   transaccionales y se está aplicando rollback de manera automática.
 
   ![rollback](./assets/rollback.png)
+
+## Pruebas de Integración con @DataJpaTest usando MySQL
+
+Primero debemos agregar el conector para mysql en el pom.xml:
+
+````xml
+
+<dependencies>
+    <dependency>
+        <groupId>com.mysql</groupId>
+        <artifactId>mysql-connector-j</artifactId>
+        <scope>runtime</scope>
+    </dependency>
+</dependencies>
+````
+
+En nuestro **application.properties** del directorio **/test/resources/** agregamos los datos de conexión a nuestra
+base de datos de MySQL. Lo agregamos aquí, ya que estaremos simulando que MySQL será nuestra base de datos real para
+pruebas.
+
+````properties
+# Datasource
+spring.datasource.url=jdbc:mysql://localhost:3306/db_spring_boot_test?serverTimezone=America/Lima
+spring.datasource.username=root
+spring.datasource.password=magadiflo
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+# Only development
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+````
+
+**NOTA**
+
+> Como dijimos en un apartado superior, ahora solo reemplazamos los datos de nuestra base de datos real (MySQL).
+> Anteriormente, usamos la misma configuración, pero con los datos de la base de datos en memoria **h2**.
+
+Finalmente, a nuestra clase de prueba le agregamos una segunda anotación: **@AutoConfigureTestDatabase()**:
+
+````java
+
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class AccountRepositoryIntegrationTest {
+    @Autowired
+    private IAccountRepository accountRepository;
+
+    @Test
+    void should_find_an_account_by_id() { /* omitted code */ }
+
+    /* other tests */
+}
+````
+
+La anotación **@AutoConfigureTestDatabase** la usamos cuando queremos ejecutar las pruebas en una base de datos real.
+Al usar **replace = AutoConfigureTestDatabase.Replace.NONE**, le estamos indicando a Spring Boot que no reemplace la
+configuración de la base de datos existente, lo que significa que utilizará la base de datos real configurada en tu
+aplicación.
+
+A continuación vemos la ejecución de nuestras pruebas, pero esta vez usando MySQL.
+![prueba-integracion-mysql.png](./assets/prueba-integracion-mysql.png)
+
+``Listo, ahora para continuar con el curso, dejaré configurado con la base de datos en memoria h2.``
