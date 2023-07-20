@@ -1235,3 +1235,109 @@ INSERT INTO accounts(person, balance) VALUES('Rosa', 750.50);
 INSERT INTO accounts(person, balance) VALUES('Santiago', 260.30);
 INSERT INTO accounts(person, balance) VALUES('Franz', 145.60);
 ````
+
+## Pruebas Unitarias a controlador: con @WebMvcTest y MockMvc
+
+### @WebMvcTest
+
+- Anotación que se puede usar para una prueba de Spring MVC que se centra solo en los componentes de Spring MVC.
+- El uso de esta anotación **deshabilitará la configuración automática completa** y, en su lugar, **aplicará solo la
+  configuración relevante** para las pruebas de MVC, **es decir, habilitará los beans @Controller, @ControllerAdvice,
+  @JsonComponent, Converter/GenericConverter, Filter, WebMvcConfigurer y HandlerMethodArgumentResolver**, pero no los
+  beans @Component, @Service o @Repository beans.
+- De forma predeterminada, **las pruebas anotadas con @WebMvcTest también configurarán automáticamente Spring Security y
+  MockMvc.**
+- Por lo general, **@WebMvcTest se usa en combinación con @MockBean o @Import** para crear cualquier colaborador
+  requerido por sus beans @Controller.
+- Spring nos brinda **la anotación @WebMvcTest** para facilitarnos los **test unitarios en de nuestros controladores.**
+- Si colocamos el controlador dentro de la anotación **@WebMvcTest(AccountController.class)**, estamos indicándole que
+  realizaremos las pruebas específicamente al controlador definido dentro de la anotación.
+
+### MockMvc
+
+- La anotación **@WebMvcTest permite especificar el controlador que se quiere probar** y tiene el efecto añadido que
+  registra algunos beans de Spring, en particular una **instancia de la clase MockMvc**, que se puede **utilizar para
+  invocar al controlador simulando la llamada HTTP sin tener que arrancar realmente ningún servidor web.**
+- Es el contexto de MVC, pero falso, **el servidor HTTP es simulado**: request, response, etc. es decir, **no estamos
+  trabajando sobre un servidor real HTTP**, lo que facilita la escritura de pruebas para controladores sin tener que
+  iniciar un servidor web real.
+- **MockMvc** ofrece una interfaz para **realizar solicitudes HTTP (GET, POST, PUT, DELETE, etc.)** a los endpoints de
+  tus controladores y **obtener las respuestas simuladas.** Esto es especialmente útil para probar el comportamiento de
+  tus controladores sin realizar solicitudes reales a una base de datos o a servicios externos.
+
+### @MockBean
+
+- La anotación **@MockBean** permite simular (mockear) el objeto sobre el cual esté anotado. Al utilizar @MockBean,
+  Spring Boot reemplaza el bean original con el objeto simulado en el contexto de la aplicación durante la ejecución de
+  la prueba.
+- Como se mencionaba en el apartado **@WebMvcTest**, por lo general, **@WebMvcTest se usa en combinación con
+  @MockBean o @Import** para crear cualquier colaborador requerido por sus beans @Controller.
+
+### ResultActions
+
+Permite aplicar acciones, como expectativas, sobre el resultado de una solicitud ejecutada, es decir, con esta clase
+manejamos la respuesta del API REST.
+
+### ObjectMapper
+
+- Nos permitirá convertir cualquier objeto en un JSON y viceversa, un JSON en un objeto que por supuesto debe existir la
+  clase a la que será convertido, donde los atributos de la clase coincidan con los nombres de los atributos del json y
+  viceversa.
+- ObjectMapper proporciona funcionalidad para leer y escribir JSON, ya sea hacia y desde POJO básicos (Plain Old Java
+  Objects) o hacia y desde un modelo de árbol JSON de propósito general (JsonNode), así como la funcionalidad
+  relacionada para realizar conversiones.
+
+## Creando Prueba Unitaria al controlador AccountController
+
+En el apartado anterior, coloqué algunas definiciones de los objetos que usaremos para crear nuestra prueba unitaria al
+controlador, de esa manera tener más claro qué es lo que hace cada uno. Ahora, llegó el momento de crear la clase de
+prueba:
+
+````java
+
+@WebMvcTest(AccountController.class)
+class AccountControllerUnitTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @MockBean
+    private IAccountService accountService;
+
+    @Test
+    void should_find_an_account() throws Exception {
+        // Given
+        Long accountId = 1L;
+        when(this.accountService.findById(accountId)).thenReturn(DataTest.account001());
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/accounts/{id}", accountId));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.person").value("Martín"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.balance").value(2000));
+        verify(this.accountService).findById(eq(accountId));
+    }
+
+    @Test
+    void should_return_empty_when_account_does_not_exist() throws Exception {
+        // Given
+        Long accountId = 10L;
+        when(this.accountService.findById(accountId)).thenReturn(Optional.empty());
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/accounts/{id}", accountId));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isNotFound());
+        verify(this.accountService).findById(eq(accountId));
+    }
+}
+````
+
+Como observamos en el código anterior, he creado dos pruebas unitarias donde se refleja un **escenario positivo** y un
+**escenario negativo** al hacer una petición a la url ``/api/v1/accounts/{id}`` enviándole un id existente y un id que
+no existe.
