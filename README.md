@@ -1041,3 +1041,33 @@ A continuación vemos la ejecución de nuestras pruebas, pero esta vez usando My
 ![prueba-integracion-mysql.png](./assets/prueba-integracion-mysql.png)
 
 ``Listo, ahora para continuar con el curso, dejaré configurado con la base de datos en memoria h2.``
+
+# Sección 6: Spring Boot: Test de Controladores con MockMvc (WebMvcTest)
+
+---
+
+## Creando controller
+
+Creamos en nuestro código fuente el controlador de nuestra aplicación. Por este capítulo solo definimos el método
+**details()**:
+
+````java
+
+@RestController
+@RequestMapping(path = "/api/v1/accounts")
+public class AccountController {
+
+    private final IAccountService accountService;
+
+    public AccountController(IAccountService accountService) {
+        this.accountService = accountService;
+    }
+
+    @GetMapping(path = "/{id}")
+    public ResponseEntity<Account> details(@PathVariable Long id) {
+        return this.accountService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+}
+````
