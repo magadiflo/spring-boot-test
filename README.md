@@ -1071,3 +1071,94 @@ public class AccountController {
     }
 }
 ````
+
+## Creando controller parte 2
+
+Continuamos con la construcción de nuestro controlador **Account**. Necesitamos implementar el método handler
+transferir, pero necesitamos un objeto que recibirá los datos en el cuerpo del request, entonces crearemos un dto
+llamado **TransactionDTO** que será un **Record**, ya que solo lo usaremos para recepcionar los datos enviados en la
+solicitud:
+
+````java
+public record TransactionDTO(Long bankId, Long accountIdOrigin, Long accountIdDestination, BigDecimal amount) {
+}
+````
+
+Ahora creamos el método **transfer()** en nuestro controlador:
+
+````java
+
+@RestController
+@RequestMapping(path = "/api/v1/accounts")
+public class AccountController {
+
+    private final IAccountService accountService;
+
+    /* construct and other handler method */
+
+    @PostMapping(path = "/transfer")
+    public ResponseEntity<?> transfer(@RequestBody TransactionDTO dto) {
+        this.accountService.transfer(dto.bankId(), dto.accountIdOrigin(), dto.accountIdDestination(), dto.amount());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("datetime", LocalDateTime.now());
+        response.put("status", HttpStatus.OK);
+        response.put("code", HttpStatus.OK.value());
+        response.put("message", "transferencia exitosa");
+        response.put("transaction", dto);
+
+        return ResponseEntity.ok(response);
+    }
+}
+````
+
+Como más adelante usaremos clientes Http como Postman o Swagger, tenemos que configurar la transacción en la clase
+service:
+
+````java
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class AccountServiceImpl implements IAccountService {
+    /* omitted code */
+
+    @Override
+    @Transactional(readOnly = true) // (1)
+    public Optional<Account> findById(Long id) { /* omitted code */ }
+
+    @Override
+    @Transactional(readOnly = true)
+    public int reviewTotalTransfers(Long bancoId) { /* omitted code */ }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal reviewBalance(Long accountId) { /* omitted code */ }
+
+    @Override
+    @Transactional                  // (2)
+    public void transfer(Long bankId, Long accountIdOrigen, Long accountIdDestination, BigDecimal amount) { /* omitted code */ }
+}
+````
+
+**DONDE**
+
+- **(1)** el método sobre el que está anotado, internamente solo hace búsquedas, es decir solo lee de la base de datos
+  algún valor buscado, no hace ninguna modificación.
+- **(2)** del método **transfer()**, sí se hacen modificaciones en la base de datos, por lo tanto, debe llevar tal cual
+  está la anotación @Transactional.
+
+**DATO**
+
+> En Spring Boot, **la anotación @Transactional se utiliza para gestionar transacciones en métodos** que forman parte de
+> un servicio o capa de servicio. **Una transacción es una secuencia de operaciones que se ejecutan como una unidad
+> indivisible de trabajo.** Si alguna de las **operaciones falla, se deshacen todas las operaciones realizadas hasta ese
+> momento**, evitando así estados inconsistentes en la base de datos.
+>
+> La anotación @Transactional se puede aplicar a nivel de clase o de método. Cuando se aplica a nivel de método,
+> significa que ese método se ejecutará dentro de una transacción.
+>
+> Cuando se establece readOnly = true, se indica que el método no realizará operaciones de escritura (modificaciones en
+> la base de datos). Esto permite que Spring optimice la transacción al no realizar un commit al final de la misma, ya
+> que no hay necesidad de persistir cambios en la base de datos. Pero si estando el método anotado con readOnly = true,
+> se intenta realizar operaciones de escritura, se producirá una excepción en tiempo de ejecución.
+

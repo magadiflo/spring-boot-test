@@ -6,6 +6,7 @@ import com.magadiflo.app.repositories.IAccountRepository;
 import com.magadiflo.app.repositories.IBankRepository;
 import com.magadiflo.app.services.IAccountService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.NoSuchElementException;
@@ -22,11 +23,13 @@ public class AccountServiceImpl implements IAccountService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Account> findById(Long id) {
         return this.accountRepository.findById(id);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int reviewTotalTransfers(Long bancoId) {
         Bank bank = this.bankRepository.findById(bancoId)
                 .orElseThrow(() -> new NoSuchElementException("No existe el banco buscado"));
@@ -34,6 +37,7 @@ public class AccountServiceImpl implements IAccountService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public BigDecimal reviewBalance(Long accountId) {
         Account account = this.accountRepository.findById(accountId)
                 .orElseThrow(() -> new NoSuchElementException("No existe la cuenta buscada"));
@@ -41,6 +45,7 @@ public class AccountServiceImpl implements IAccountService {
     }
 
     @Override
+    @Transactional
     public void transfer(Long bankId, Long accountIdOrigen, Long accountIdDestination, BigDecimal amount) {
         Account accountOrigen = this.accountRepository.findById(accountIdOrigen)
                 .orElseThrow(() -> new NoSuchElementException("No existe el id de la cuenta origen"));
