@@ -612,6 +612,65 @@ objeto simulado (mock) de la dependencia correspondiente y lo inyectará en la c
 comportamiento de la dependencia y definir respuestas predefinidas para los métodos llamados durante la prueba.
 ``Generalmente, se usará esta anotación en otras capas de la aplicación, como el controlador.``
 
+## Agregando más Pruebas Unitarias al service - findAll()
+
+En este apartado se crea la prueba unitaria para el **AccountServiceImpl** su método **findAll()**. Esta prueba unitaria
+es la misma para los tres clases: **AccountServiceImplUnitTest, AccountServiceImplWithMockitoAnnotationsUnitTest, y
+para AccountServiceImplWithSpringBootAnnotationsUnitTest:**
+
+````java
+class AccountServiceImplUnitTest {
+
+    /* omitted properties and other tests */
+
+    @Test
+    void should_find_all_accounts() {
+        List<Account> accountsRepo = List.of(DataTest.account001().get(), DataTest.account002().get());
+        when(this.accountRepository.findAll()).thenReturn(accountsRepo);
+
+        List<Account> accounts = this.accountService.findAll();
+
+        assertFalse(accounts.isEmpty());
+        assertEquals(accountsRepo.size(), accounts.size());
+        assertTrue(accounts.contains(DataTest.account002().get()));
+        verify(this.accountRepository).findAll();
+    }
+}
+````
+
+## Agregando más Pruebas Unitarias al service - save()
+
+Este apartado es similar al apartado anterior, escribimos el test unitario para el método **save()**, este test
+unitario también estará definido en las tres clases: **AccountServiceImplUnitTest,
+AccountServiceImplWithMockitoAnnotationsUnitTest, y
+para AccountServiceImplWithSpringBootAnnotationsUnitTest:**
+
+````java
+class AccountServiceImplUnitTest {
+
+    /* omitted properties and other tests */
+
+    @Test
+    void should_save_an_account() {
+        Long idBD = 10L;
+        Account account = new Account(null, "Martín", new BigDecimal("2000"));
+        doAnswer(invocation -> {
+            Account accountDB = invocation.getArgument(0);
+            accountDB.setId(idBD);
+            return accountDB;
+        }).when(this.accountRepository).save(any(Account.class));
+
+        Account accountSaved = this.accountService.save(account);
+
+        assertNotNull(accountSaved);
+        assertNotNull(accountSaved.getId());
+        assertEquals(idBD, accountSaved.getId());
+        assertEquals(account.getPerson(), accountSaved.getPerson());
+        assertEquals(account.getBalance(), accountSaved.getBalance());
+    }
+}
+````
+
 # Sección 5: Spring Boot: Test de Repositorios (DataJpaTest)
 
 ---
@@ -1041,3 +1100,500 @@ A continuación vemos la ejecución de nuestras pruebas, pero esta vez usando My
 ![prueba-integracion-mysql.png](./assets/prueba-integracion-mysql.png)
 
 ``Listo, ahora para continuar con el curso, dejaré configurado con la base de datos en memoria h2.``
+
+# Sección 6: Spring Boot: Test de Controladores con MockMvc (WebMvcTest)
+
+---
+
+## Creando controller
+
+Creamos en nuestro código fuente el controlador de nuestra aplicación. Por este capítulo solo definimos el método
+**details()**:
+
+````java
+
+@RestController
+@RequestMapping(path = "/api/v1/accounts")
+public class AccountController {
+
+    private final IAccountService accountService;
+
+    public AccountController(IAccountService accountService) {
+        this.accountService = accountService;
+    }
+
+    @GetMapping(path = "/{id}")
+    public ResponseEntity<Account> details(@PathVariable Long id) {
+        return this.accountService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+}
+````
+
+## Creando controller parte 2
+
+Continuamos con la construcción de nuestro controlador **Account**. Necesitamos implementar el método handler
+transferir, pero necesitamos un objeto que recibirá los datos en el cuerpo del request, entonces crearemos un dto
+llamado **TransactionDTO** que será un **Record**, ya que solo lo usaremos para recepcionar los datos enviados en la
+solicitud:
+
+````java
+public record TransactionDTO(Long bankId, Long accountIdOrigin, Long accountIdDestination, BigDecimal amount) {
+}
+````
+
+Ahora creamos el método **transfer()** en nuestro controlador:
+
+````java
+
+@RestController
+@RequestMapping(path = "/api/v1/accounts")
+public class AccountController {
+
+    private final IAccountService accountService;
+
+    /* construct and other handler method */
+
+    @PostMapping(path = "/transfer")
+    public ResponseEntity<?> transfer(@RequestBody TransactionDTO dto) {
+        this.accountService.transfer(dto.bankId(), dto.accountIdOrigin(), dto.accountIdDestination(), dto.amount());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("datetime", LocalDateTime.now());
+        response.put("status", HttpStatus.OK);
+        response.put("code", HttpStatus.OK.value());
+        response.put("message", "transferencia exitosa");
+        response.put("transaction", dto);
+
+        return ResponseEntity.ok(response);
+    }
+}
+````
+
+Como más adelante usaremos clientes Http como Postman o Swagger, tenemos que configurar la transacción en la clase
+service:
+
+````java
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class AccountServiceImpl implements IAccountService {
+    /* omitted code */
+
+    @Override
+    @Transactional(readOnly = true) // (1)
+    public Optional<Account> findById(Long id) { /* omitted code */ }
+
+    @Override
+    @Transactional(readOnly = true)
+    public int reviewTotalTransfers(Long bancoId) { /* omitted code */ }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal reviewBalance(Long accountId) { /* omitted code */ }
+
+    @Override
+    @Transactional                  // (2)
+    public void transfer(Long bankId, Long accountIdOrigen, Long accountIdDestination, BigDecimal amount) { /* omitted code */ }
+}
+````
+
+**DONDE**
+
+- **(1)** el método sobre el que está anotado, internamente solo hace búsquedas, es decir solo lee de la base de datos
+  algún valor buscado, no hace ninguna modificación.
+- **(2)** del método **transfer()**, sí se hacen modificaciones en la base de datos, por lo tanto, debe llevar tal cual
+  está la anotación @Transactional.
+
+**DATO**
+
+> En Spring Boot, **la anotación @Transactional se utiliza para gestionar transacciones en métodos** que forman parte de
+> un servicio o capa de servicio. **Una transacción es una secuencia de operaciones que se ejecutan como una unidad
+> indivisible de trabajo.** Si alguna de las **operaciones falla, se deshacen todas las operaciones realizadas hasta ese
+> momento**, evitando así estados inconsistentes en la base de datos.
+>
+> La anotación @Transactional se puede aplicar a nivel de clase o de método. Cuando se aplica a nivel de método,
+> significa que ese método se ejecutará dentro de una transacción.
+>
+> Cuando se establece readOnly = true, se indica que el método no realizará operaciones de escritura (modificaciones en
+> la base de datos). Esto permite que Spring optimice la transacción al no realizar un commit al final de la misma, ya
+> que no hay necesidad de persistir cambios en la base de datos. Pero si estando el método anotado con readOnly = true,
+> se intenta realizar operaciones de escritura, se producirá una excepción en tiempo de ejecución.
+
+## Configurando Swagger
+
+Usaré la dependencia que se usa en el tutorial:
+[Spring Boot 3 + Swagger: Documentando una API REST desde cero,](https://www.youtube.com/watch?v=-SzKqwgPTyk)
+ya que esta dependencia incluye varias características, tanto la especificación de **OpenAPI** y el **Swagger-UI** para
+Spring Boot 3 entre otras
+([Ver artículo del mismo tutorial para más información](https://sacavix.com/2023/03/spring-boot-3-spring-doc-swagger-un-ejemplo/)):
+
+La documentación la podemos encontrar en: **[https://springdoc.org/](https://springdoc.org/)**:
+
+````xml
+<!-- https://springdoc.org/  -->
+<dependencies>
+    <dependency>
+        <groupId>org.springdoc</groupId>
+        <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+        <version>2.1.0</version>
+    </dependency>
+</dependencies>
+````
+
+**IMPORTANTE**
+
+- Tan solo agregando la dependencia anterior **(sin configuración adicional)** nuestra aplicación de Spring Boot queda
+  configurado con swagger-ui.
+- La página de la interfaz de usuario de Swagger estará disponible en: ``http://localhost:8080/swagger-ui/index.html``
+- La descripción de OpenAPI estará disponible en la siguiente URL para el formato
+  json: ``http://localhost:8080/v3/api-docs``
+
+**DATO**
+
+- **OpenAPI** es una especificación. Es una especificación independiente del lenguaje que sirve para describir API REST.
+  Es una serie de reglas, especificaciones y herramientas que nos ayudan a documentar nuestras APIs.
+- **Swagger** es una herramienta que usa la especificación OpenAPI. Por ejemplo, OpenAPIGenerator y **SwaggerUI.**
+
+## Configurando Base de datos MySQL
+
+Como en nuestras dependencias ya tenemos agregado el conector a **MySQL**, agregaremos los datos de conexión a la base
+de datos en el application.properties, ya que antes de hacer los tests, necesitamos verificar que la aplicación esté
+funcionando. Recordar que también tenemos la dependencia de **h2**, pero esta dependencia la estamos usando para hacer
+los test, mientras que la dependencia de **MySQL** lo usaremos para hacer funcionar nuestra aplicación, con nuestro
+código fuente real.
+
+``src/main/resources/application.properties``
+
+````properties
+# Datasource
+spring.datasource.url=jdbc:mysql://localhost:3306/db_spring_boot_test?serverTimezone=America/Lima
+spring.datasource.username=root
+spring.datasource.password=magadiflo
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+# Only development
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+````
+
+Creamos un archivo **import.sql** en la misma ruta del application.properties anterior:
+
+``src/main/resources/import.sql``
+
+````sql
+INSERT INTO banks(name, total_transfers) VALUES('Banco de Crédito', 0);
+INSERT INTO banks(name, total_transfers) VALUES('Banco Interbank', 0);
+INSERT INTO banks(name, total_transfers) VALUES('Banco Scotiabank', 0);
+INSERT INTO banks(name, total_transfers) VALUES('Banco BBVA', 0);
+
+INSERT INTO accounts(person, balance) VALUES('Karen', 500);
+INSERT INTO accounts(person, balance) VALUES('Miluska', 1500);
+INSERT INTO accounts(person, balance) VALUES('Rosa', 750.50);
+INSERT INTO accounts(person, balance) VALUES('Santiago', 260.30);
+INSERT INTO accounts(person, balance) VALUES('Franz', 145.60);
+````
+
+## Pruebas Unitarias a controlador: con @WebMvcTest y MockMvc
+
+### @WebMvcTest
+
+- Anotación que se puede usar para una prueba de Spring MVC que se centra solo en los componentes de Spring MVC.
+- El uso de esta anotación **deshabilitará la configuración automática completa** y, en su lugar, **aplicará solo la
+  configuración relevante** para las pruebas de MVC, **es decir, habilitará los beans @Controller, @ControllerAdvice,
+  @JsonComponent, Converter/GenericConverter, Filter, WebMvcConfigurer y HandlerMethodArgumentResolver**, pero no los
+  beans @Component, @Service o @Repository beans.
+- De forma predeterminada, **las pruebas anotadas con @WebMvcTest también configurarán automáticamente Spring Security y
+  MockMvc.**
+- Por lo general, **@WebMvcTest se usa en combinación con @MockBean o @Import** para crear cualquier colaborador
+  requerido por sus beans @Controller.
+- Spring nos brinda **la anotación @WebMvcTest** para facilitarnos los **test unitarios en de nuestros controladores.**
+- Si colocamos el controlador dentro de la anotación **@WebMvcTest(AccountController.class)**, estamos indicándole que
+  realizaremos las pruebas específicamente al controlador definido dentro de la anotación.
+
+### MockMvc
+
+- La anotación **@WebMvcTest permite especificar el controlador que se quiere probar** y tiene el efecto añadido que
+  registra algunos beans de Spring, en particular una **instancia de la clase MockMvc**, que se puede **utilizar para
+  invocar al controlador simulando la llamada HTTP sin tener que arrancar realmente ningún servidor web.**
+- Es el contexto de MVC, pero falso, **el servidor HTTP es simulado**: request, response, etc. es decir, **no estamos
+  trabajando sobre un servidor real HTTP**, lo que facilita la escritura de pruebas para controladores sin tener que
+  iniciar un servidor web real.
+- **MockMvc** ofrece una interfaz para **realizar solicitudes HTTP (GET, POST, PUT, DELETE, etc.)** a los endpoints de
+  tus controladores y **obtener las respuestas simuladas.** Esto es especialmente útil para probar el comportamiento de
+  tus controladores sin realizar solicitudes reales a una base de datos o a servicios externos.
+
+### @MockBean
+
+- La anotación **@MockBean** permite simular (mockear) el objeto sobre el cual esté anotado. Al utilizar @MockBean,
+  Spring Boot reemplaza el bean original con el objeto simulado en el contexto de la aplicación durante la ejecución de
+  la prueba.
+- Como se mencionaba en el apartado **@WebMvcTest**, por lo general, **@WebMvcTest se usa en combinación con
+  @MockBean o @Import** para crear cualquier colaborador requerido por sus beans @Controller.
+
+### ResultActions
+
+Permite aplicar acciones, como expectativas, sobre el resultado de una solicitud ejecutada, es decir, con esta clase
+manejamos la respuesta del API REST.
+
+### ObjectMapper
+
+- Nos permitirá convertir cualquier objeto en un JSON y viceversa, un JSON en un objeto que por supuesto debe existir la
+  clase a la que será convertido, donde los atributos de la clase coincidan con los nombres de los atributos del json y
+  viceversa.
+- ObjectMapper proporciona funcionalidad para leer y escribir JSON, ya sea hacia y desde POJO básicos (Plain Old Java
+  Objects) o hacia y desde un modelo de árbol JSON de propósito general (JsonNode), así como la funcionalidad
+  relacionada para realizar conversiones.
+
+## Creando Prueba Unitaria al controlador AccountController
+
+En el apartado anterior, coloqué algunas definiciones de los objetos que usaremos para crear nuestra prueba unitaria al
+controlador, de esa manera tener más claro qué es lo que hace cada uno. Ahora, llegó el momento de crear la clase de
+prueba:
+
+````java
+
+@WebMvcTest(AccountController.class)
+class AccountControllerUnitTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @MockBean
+    private IAccountService accountService;
+
+    @Test
+    void should_find_an_account() throws Exception {
+        // Given
+        Long accountId = 1L;
+        when(this.accountService.findById(accountId)).thenReturn(DataTest.account001());
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/accounts/{id}", accountId));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.person").value("Martín"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.balance").value(2000));
+        verify(this.accountService).findById(eq(accountId));
+    }
+
+    @Test
+    void should_return_empty_when_account_does_not_exist() throws Exception {
+        // Given
+        Long accountId = 10L;
+        when(this.accountService.findById(accountId)).thenReturn(Optional.empty());
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/accounts/{id}", accountId));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isNotFound());
+        verify(this.accountService).findById(eq(accountId));
+    }
+}
+````
+
+Como observamos en el código anterior, he creado dos pruebas unitarias donde se refleja un **escenario positivo** y un
+**escenario negativo** al hacer una petición a la url ``/api/v1/accounts/{id}`` enviándole un id existente y un id que
+no existe.
+
+## Escribiendo pruebas para el controlador parte 2
+
+Crearemos la prueba unitaria para nuestro endpoint **/api/v1/accounts/transfer**. Al ser un método post, estamos
+enviándole información por el cuerpo de la petición, por lo tanto requerimos convertir el dto en un objeto json, aquí
+entra el uso de nuestro objeto **ObjectMapper**:
+
+````java
+
+@WebMvcTest(AccountController.class)
+class AccountControllerUnitTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @MockBean
+    private IAccountService accountService;
+
+    /* omitted other tests */
+
+    @Test
+    void should_transfer_an_amount_between_accounts() throws Exception {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("100"));
+        doNothing().when(this.accountService).transfer(dto.bankId(), dto.accountIdOrigin(), dto.accountIdDestination(), dto.amount());
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/accounts/transfer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(this.objectMapper.writeValueAsString(dto)));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.code").value(HttpStatus.OK.value()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.datetime").exists())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("transferencia exitosa"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.transaction.accountIdOrigin").value(dto.accountIdOrigin()));
+
+        String jsonResponse = response.andReturn().getResponse().getContentAsString();
+        JsonNode jsonNode = this.objectMapper.readTree(jsonResponse);
+
+        String dateTime = jsonNode.get("datetime").asText();
+        LocalDateTime localDateTime = LocalDateTime.parse(dateTime);
+
+        assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+    }
+}
+````
+
+## Ejecutando tests con cobertura de código (Code Coverage)
+
+Para ver la cobertura de los test realizados vamos a la **raíz del proyecto** y damos **clic secundario** y
+seleccionamos ``Run 'All Tests' with Coverage``. Se ejecutarán todos nuestros test, unitarios y de integración para
+finalmente mostrarnos el siguiente resultado:
+
+![code-coverage.png](./assets/code-coverage.png)
+
+## Más Pruebas Unitarias con MockMvc - Listar
+
+Implementamos nuevos métodos a testear: **findAll() y save()**.
+
+````java
+public interface IAccountService {
+    List<Account> findAll();
+
+    Account save(Account account);
+    /* omitted other methods */
+}
+````
+
+````java
+
+@Service
+public class AccountServiceImpl implements IAccountService {
+    /* omitted code */
+
+    @Override
+    public List<Account> findAll() {
+        return this.accountRepository.findAll();
+    }
+
+    @Override
+    public Account save(Account account) {
+        return this.accountRepository.save(account);
+    }
+    /* omitted code */
+
+}
+````
+
+````java
+
+@RestController
+@RequestMapping(path = "/api/v1/accounts")
+public class AccountController {
+    /* omitted code */
+
+    @GetMapping
+    public ResponseEntity<List<Account>> listAllAccounts() {
+        return ResponseEntity.ok(this.accountService.findAll());
+    }
+
+    @PostMapping
+    public ResponseEntity<Account> saveAccount(@RequestBody Account account) {
+        Account accountDB = this.accountService.save(account);
+        URI accountURI = URI.create("/api/v1/accounts/" + accountDB.getId());
+        return ResponseEntity.created(accountURI).body(accountDB);
+    }
+    /* omitted code */
+}
+````
+
+Ahora implementamos el test para probar que el endpoint nos retorne el listado de cuentas:
+
+````java
+
+@WebMvcTest(AccountController.class)
+class AccountControllerUnitTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @MockBean
+    private IAccountService accountService;
+
+    @Test
+    void should_find_all_accounts() throws Exception {
+        // Given
+        List<Account> accountList = List.of(DataTest.account001().get(), DataTest.account002().get());
+        when(this.accountService.findAll()).thenReturn(accountList);
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/accounts"));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].person").value("Martín"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].balance").value(2000))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[1].person").value("Alicia"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[1].balance").value(1000))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.size()", Matchers.is(accountList.size())))
+                .andExpect(MockMvcResultMatchers.jsonPath("$", Matchers.hasSize(accountList.size())))
+                .andExpect(MockMvcResultMatchers.content().json(this.objectMapper.writeValueAsString(accountList)));
+
+        verify(this.accountService).findAll();
+    }
+}
+````
+
+## Más Pruebas Unitarias con MockMvc - Guardar
+
+````java
+
+@WebMvcTest(AccountController.class)
+class AccountControllerUnitTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @MockBean
+    private IAccountService accountService;
+
+    /* omitted other tests */
+
+    @Test
+    void should_save_an_account() throws Exception {
+        Long idDB = 10L;
+        // Given
+        Account account = new Account(null, "Martín", new BigDecimal("2000"));
+        doAnswer(invocation -> {
+            Account accountDB = invocation.getArgument(0);
+            accountDB.setId(idDB);
+            return accountDB;
+        }).when(this.accountService).save(any(Account.class));
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/accounts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(this.objectMapper.writeValueAsString(account)));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isCreated())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.header().string("Location", "/api/v1/accounts/" + idDB))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id", Matchers.is(idDB.intValue())))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.person", Matchers.is("Martín")))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.balance", Matchers.is(2000)));
+
+        verify(this.accountService).save(any(Account.class));
+    }
+}
+````
