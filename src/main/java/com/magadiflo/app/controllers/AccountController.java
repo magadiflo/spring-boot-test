@@ -38,7 +38,7 @@ public class AccountController {
     @PostMapping
     public ResponseEntity<Account> saveAccount(@RequestBody Account account) {
         Account accountDB = this.accountService.save(account);
-        URI accountURI = URI.create("/api/v1/accounts" + accountDB.getId());
+        URI accountURI = URI.create("/api/v1/accounts/" + accountDB.getId());
         return ResponseEntity.created(accountURI).body(accountDB);
     }
 

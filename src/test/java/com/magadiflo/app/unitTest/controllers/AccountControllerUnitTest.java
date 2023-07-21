@@ -120,4 +120,31 @@ class AccountControllerUnitTest {
 
         verify(this.accountService).findAll();
     }
+
+    @Test
+    void should_save_an_account() throws Exception {
+        Long idDB = 10L;
+        // Given
+        Account account = new Account(null, "Martín", new BigDecimal("2000"));
+        doAnswer(invocation -> {
+            Account accountDB  = invocation.getArgument(0);
+            accountDB.setId(idDB);
+            return accountDB;
+        }).when(this.accountService).save(any(Account.class));
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/accounts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(this.objectMapper.writeValueAsString(account)));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isCreated())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.header().string("Location", "/api/v1/accounts/" + idDB))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id", Matchers.is(idDB.intValue())))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.person", Matchers.is("Martín")))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.balance", Matchers.is(2000)));
+
+        verify(this.accountService).save(any(Account.class));
+    }
 }
