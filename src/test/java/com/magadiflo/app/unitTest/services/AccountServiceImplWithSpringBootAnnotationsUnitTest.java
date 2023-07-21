@@ -126,4 +126,23 @@ class AccountServiceImplWithSpringBootAnnotationsUnitTest {
         assertTrue(accounts.contains(DataTest.account002().get()));
         verify(this.accountRepository).findAll();
     }
+
+    @Test
+    void should_save_an_account() {
+        Long idBD = 10L;
+        Account account = new Account(null, "Martín", new BigDecimal("2000"));
+        doAnswer(invocation -> {
+            Account accountDB = invocation.getArgument(0);
+            accountDB.setId(idBD);
+            return accountDB;
+        }).when(this.accountRepository).save(any(Account.class));
+
+        Account accountSaved = this.accountService.save(account);
+
+        assertNotNull(accountSaved);
+        assertNotNull(accountSaved.getId());
+        assertEquals(idBD, accountSaved.getId());
+        assertEquals(account.getPerson(), accountSaved.getPerson());
+        assertEquals(account.getBalance(), accountSaved.getBalance());
+    }
 }

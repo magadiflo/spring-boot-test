@@ -24,6 +24,7 @@ public class AccountServiceImpl implements IAccountService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Account> findAll() {
         return this.accountRepository.findAll();
     }
@@ -35,6 +36,7 @@ public class AccountServiceImpl implements IAccountService {
     }
 
     @Override
+    @Transactional
     public Account save(Account account) {
         return this.accountRepository.save(account);
     }

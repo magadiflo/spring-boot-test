@@ -638,6 +638,39 @@ class AccountServiceImplUnitTest {
 }
 ````
 
+## Agregando más Pruebas Unitarias al service - save()
+
+Este apartado es similar al apartado anterior, escribimos el test unitario para el método **save()**, este test
+unitario también estará definido en las tres clases: **AccountServiceImplUnitTest,
+AccountServiceImplWithMockitoAnnotationsUnitTest, y
+para AccountServiceImplWithSpringBootAnnotationsUnitTest:**
+
+````java
+class AccountServiceImplUnitTest {
+
+    /* omitted properties and other tests */
+
+    @Test
+    void should_save_an_account() {
+        Long idBD = 10L;
+        Account account = new Account(null, "Martín", new BigDecimal("2000"));
+        doAnswer(invocation -> {
+            Account accountDB = invocation.getArgument(0);
+            accountDB.setId(idBD);
+            return accountDB;
+        }).when(this.accountRepository).save(any(Account.class));
+
+        Account accountSaved = this.accountService.save(account);
+
+        assertNotNull(accountSaved);
+        assertNotNull(accountSaved.getId());
+        assertEquals(idBD, accountSaved.getId());
+        assertEquals(account.getPerson(), accountSaved.getPerson());
+        assertEquals(account.getBalance(), accountSaved.getBalance());
+    }
+}
+````
+
 # Sección 5: Spring Boot: Test de Repositorios (DataJpaTest)
 
 ---
