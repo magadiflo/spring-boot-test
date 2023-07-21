@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -131,5 +132,53 @@ class AccountControllerWebTestClientIntegrationTest {
                     assertEquals(expectedAccount.getBalance(), accountDB.getBalance());
                 });
 
+    }
+
+    @Test
+    @Order(5)
+    void should_find_all_accounts_with_jsonPath() {
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts").exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$").isArray()
+                .jsonPath("$").value(Matchers.hasSize(2))
+                .jsonPath("$.size()").isEqualTo(2)
+                .jsonPath("$[0].id").isEqualTo(1)
+                .jsonPath("$[0].person").isEqualTo("Martín")
+                .jsonPath("$[0].balance").isEqualTo(1880)
+                .jsonPath("$[1].id").isEqualTo(2)
+                .jsonPath("$[1].person").isEqualTo("Alicia")
+                .jsonPath("$[1].balance").isEqualTo(1120);
+    }
+
+    @Test
+    @Order(5)
+    void should_find_all_accounts_with_consumeWith() {
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts").exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBodyList(Account.class)
+                .consumeWith(result -> {
+                    List<Account> accountListDB = result.getResponseBody();
+
+                    assertNotNull(accountListDB);
+                    assertFalse(accountListDB.isEmpty());
+                    assertEquals(2, accountListDB.size());
+                    assertEquals(1L, accountListDB.get(0).getId());
+                    assertEquals("Martín", accountListDB.get(0).getPerson());
+                    assertEquals(1880D, accountListDB.get(0).getBalance().doubleValue());
+                    assertEquals(2L, accountListDB.get(1).getId());
+                    assertEquals("Alicia", accountListDB.get(1).getPerson());
+                    assertEquals(1120D, accountListDB.get(1).getBalance().doubleValue());
+                })
+                .hasSize(2)
+                .value(Matchers.hasSize(2));
     }
 }
