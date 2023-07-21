@@ -1821,7 +1821,10 @@ class AccountControllerWebTestClientIntegrationTest {
 ````
 
 Ahora sí, **ejecutamos solo el test de integración** y como resultado veremos una ejecución exitosa en una sola
-instancia.
+instancia. Además, de esta manera usamos la base de datos **h2** y **no la de MySQL**. Recordemos que en las
+dependencias del **pom.xml** configuramos la dependencia de **h2 con scope en test**. Por lo tanto, ahora usará los
+datos que estén poblados en la base de datos de **h2** o la que tengamos configurado en el **application.properties**
+de nuestro **/test/resources/application.properties**:
 
 ![una-sola-instancia.png](./assets/una-sola-instancia.png)
 
@@ -1829,3 +1832,79 @@ instancia.
 
 > Si nuestra aplicación backend está separada de nuestros test de integración, obviamente allí sí debemos usar la ruta
 > completa tal como lo hicimos en el apartado **Ejecutando nuestro test de integración - Instancias separadas**
+
+## Prueba de Integración - Usando .consumeWith()
+
+En el test anterior usamos el **jsonPath()** para comprobar los resultados esperados y actuales, tal como se ve en
+el siguiente extracto de código:
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+    /* omitted code */
+
+    @Test
+    void should_transfer_amount_between_two_accounts() {
+        /* omitted code */
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.message").isNotEmpty()
+                .jsonPath("$.message").value(Matchers.is("transferencia exitosa"))
+                .jsonPath("$.message").value(message -> assertEquals("transferencia exitosa", message))
+                .jsonPath("$.message").isEqualTo("transferencia exitosa")
+                .jsonPath("$.transaction.accountIdOrigin").isEqualTo(dto.accountIdOrigin())
+                .jsonPath("$.datetime").value(datetime -> {
+                    LocalDateTime localDateTime = LocalDateTime.parse(datetime.toString());
+                    assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                });
+
+    }
+}
+````
+
+Existe otra forma de realizar la misma comprobación y es usando el método **.consumeWith()**. El consumeWith() recibe
+dentro de su método una expresión lambda que le permitirá consumir la respuesta y hacer los asserts:
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_transfer_amount_between_two_accounts_with_consumeWith() {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("20"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts/transfer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)
+                .exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .consumeWith(result -> { //<-- Otra forma de poder realizar la comprobación
+                    try {
+                        JsonNode jsonNode = this.objectMapper.readTree(result.getResponseBody());
+
+                        assertEquals("transferencia exitosa", jsonNode.path("message").asText());
+                        assertEquals(dto.accountIdOrigin(), jsonNode.path("transaction").path("accountIdOrigin").asLong());
+                        assertEquals(dto.amount().doubleValue(), jsonNode.path("transaction").path("amount").asDouble());
+
+                        LocalDateTime localDateTime = LocalDateTime.parse(jsonNode.path("datetime").asText());
+                        assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+    }
+}
+````
