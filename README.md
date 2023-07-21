@@ -2207,3 +2207,69 @@ class AccountControllerWebTestClientIntegrationTest {
     }
 }
 ````
+
+## Test de Integración: para el guardar
+
+````java
+
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    @Order(6)
+    void should_save_an_account_with_jsonPath() {
+        // Given
+        Long idDB = 3L;
+        Account accountToSave = new Account(null, "María", new BigDecimal("5000"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(accountToSave)
+                .exchange();
+
+        // Then
+        response.expectStatus().isCreated()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectHeader().location("/api/v1/accounts/" + idDB)
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(idDB)
+                .jsonPath("$.person").value(Matchers.is(accountToSave.getPerson()))
+                .jsonPath("$.balance").isEqualTo(accountToSave.getBalance());
+    }
+
+    @Test
+    @Order(7)
+    void should_save_an_account_with_consumeWith() {
+        // Given
+        Long idDB = 4L;
+        Account accountToSave = new Account(null, "Livved", new BigDecimal("3000"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(accountToSave)
+                .exchange();
+
+        // Then
+        response.expectStatus().isCreated()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectHeader().location("/api/v1/accounts/" + idDB)
+                .expectBody(Account.class)
+                .consumeWith(result -> {
+                    Account accountDB = result.getResponseBody();
+
+                    assertNotNull(accountDB);
+                    assertEquals(idDB, accountDB.getId());
+                    assertEquals(accountToSave.getPerson(), accountDB.getPerson());
+                    assertEquals(accountToSave.getBalance(), accountDB.getBalance());
+                });
+    }
+}
+````
