@@ -1597,3 +1597,235 @@ class AccountControllerUnitTest {
     }
 }
 ````
+
+# Sección 7: Spring Boot: Test de integración de servicios rest con WebTestClient
+
+---
+
+## Pruebas de Integración: con WebClient
+
+### Introducción
+
+En esta sección **realizaremos pruebas reales** a nuestros endpoints, eso significa que **no usaremos MockMvc** para
+simular las peticiones como lo hicimos en la sección anterior, aunque, viendo el tutorial de
+[JavaGuides](https://www.javaguides.net/2022/03/spring-boot-integration-testing-mysql-crud-rest-api-tutorial.html#google_vignette),
+allí sí usa el **MockMvc** con ciertas configuraciones para que la petición realizada sean a los endpoints reales y no
+simulados, pero para nuestro caso usaremos los clientes HTTP proporcionados por Spring.
+
+Cada vez que hagamos las pruebas de integración de nuestros endpoints, **nuestro backend debe estar levantado**, por
+ejemplo en el puerto 8080; esto por una razón, nuestros tests van a consumir los endpoints reales, por lo tanto, estos
+deben estar funcionando.
+
+Para realizar estas pruebas de integración de nuestros endpoints, **usaremos clientes HTTP**, como: WebClient y
+RestTemplate; estos son los principales clientes que SpringBoot ofrece para consumir Servicios Rest. En esta sección
+trabajaremos con **WebClient**.
+
+> Siempre trabajaremos con un único cliente http para realizar pruebas de integración, ya sea **utilizando RestTemplate
+> o WebClient**
+
+### WebClient
+
+**Spring WebFlux incluye un cliente para realizar solicitudes HTTP.** WebClient tiene una API funcional y fluida basada
+en Reactor. Es completamente sin bloqueo, admite transmisión y se basa en los mismos códecs que también se utilizan para
+codificar y decodificar contenido de solicitud y respuesta en el lado del servidor.
+
+**WebClient** es un cliente HTTP de **Spring** que permite realizar solicitudes HTTP de manera reactiva y no bloqueante
+en aplicaciones basadas en Spring. Es una opción recomendada para nuevas aplicaciones y reemplaza gradualmente a
+RestTemplate en el ecosistema de Spring.
+
+### WebTestClient
+
+**WebTestClient es un cliente HTTP** diseñado para probar aplicaciones de servidor. **Envuelve el WebClient de Spring**
+y lo usa para realizar solicitudes, pero expone una fachada de prueba para verificar las respuestas. WebTestClient se
+puede utilizar para realizar pruebas HTTP de extremo a extremo. También se puede usar para probar aplicaciones Spring
+MVC y Spring WebFlux sin un servidor en ejecución a través de objetos de respuesta y solicitud de servidor simulados.
+
+Por lo tanto, **para trabajar con el cliente HTTP WebClient**, o para ser más precisos con **WebTestClient**,
+necesitamos agregar la siguiente dependencia:
+
+````xml
+
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-webflux</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+````
+
+**NOTA**
+> Observar que el **scope** de la dependencia de webflux lo colocamos en **test**, puesto que será usado en nuestra
+> aplicación solo para eso, realizar pruebas.
+
+### @SpringBootTest()
+
+Spring Boot proporciona esta anotación **(@SpringBootTest)** para realizar pruebas de integración. Esta anotación crea
+un contexto de aplicación y carga el contexto completo de la aplicación.
+
+**@SpringBootTest** arranca el contexto completo de la aplicación, lo que significa que podemos usar el **@Autowired**
+para poder usar **inyección de dependencia**. Inicia un servidor embebido, crea un entorno web y, a continuación,
+permite a los métodos **@Test** realizar pruebas de integración.
+
+### webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
+
+De forma predeterminada **@SpringBootTest** no inicia un servidor, necesitamos agregar el atributo **webEnvironment**
+para refinar aún más cómo se ejecutarán sus pruebas. Tiene varias opciones:
+
+- **MOCK(default)**, carga un contexto de aplicación web y proporciona un entorno web simulado.
+- **RANDOM_PORT**, carga un WebServerApplicationContext y **proporciona un entorno web real.** El servidor embebido se
+  inicia y escucha en un puerto aleatorio. **Este es el que se debe utilizar para la prueba de integración.**
+- **DEFINED_PORT**, carga un WebServerApplicationContext y proporciona un entorno web real.
+- **NONE**, carga un ApplicationContext usando SpringApplication, pero no proporciona ningún entorno web.
+
+## Creando nuestra clase de prueba de integración con WebTestClient
+
+Luego de haber visto los conceptos necesarios para entender lo que se usa en el código de test, procedo a mostrar el
+primer test de integración creado:
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_transfer_amount_between_two_accounts() {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("100"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("http://localhost:8080/api/v1/accounts/transfer") //(1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)     // (2)
+                .exchange();        // (3)
+
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.message").isNotEmpty()
+                .jsonPath("$.message").value(Matchers.is("transferencia exitosa"))
+                .jsonPath("$.message").value(message -> assertEquals("transferencia exitosa", message))
+                .jsonPath("$.message").isEqualTo("transferencia exitosa")
+                .jsonPath("$.transaction.accountIdOrigin").isEqualTo(dto.accountIdOrigin())
+                .jsonPath("$.datetime").value(datetime -> {
+                    LocalDateTime localDateTime = LocalDateTime.parse(datetime.toString());
+                    assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                });
+    }
+}
+````
+
+**DONDE**
+
+- **(1)** url completa donde se está ejecutando nuestro endpoint a ser testeado.
+- **(2)** el método **bodyValue()** por debajo convierte al objeto pasado en un JSON.
+- **(3)** el método **exchange()**, ejecuta el envío de la solicitud, lo que venga después del **exchange()** es la
+  respuesta.
+
+## Ejecutando nuestro test de integración - Instancias separadas
+
+Si **solo ejecutamos el test anterior, sin hacer nada más** observamos el siguiente resultado:
+
+![error-test-integracion-run.png](./assets/error-test-integracion-run.png)
+
+El error mostrado ``Connection refused: no further information: localhost/127.0.0.1:8080`` nos dice que no ha encontrado
+algún servidor ejecutándose en esa dirección. Eso tiene sentido, ya que **solo ejecutamos nuestra clase de test** sin
+haber hecho nada más.
+
+Lo que debemos realizar **antes de ejecutar el test es levantar nuestro proyecto real**, una vez levantado el proyecto
+real, allí recién ejecutaremos nuestro test. **Recordar que nuestro proyecto real está trabajando con MySQL así que
+también debemos tener levantado esa base de datos.**
+
+Una **vez tengamos levantado el proyecto real, vamos a nuestro test de integración y lo ejecutamos.** Nuestro test se
+levantará en su propio servidor y en otro puerto distinto al de la aplicación real, esto gracias al **RANDOM_PORT**.
+
+Observamos en la siguiente imagen que tenemos levantado nuestra aplicación real y además al ejecutar nuestro test de
+integración, este lo hace en otro servidor.
+
+![run-test-integracion.png](./assets/run-test-integracion.png)
+
+**NOTA**
+
+> Debemos ejecutar este test levantando estas dos instancias, ya que en el
+> ``uri("http://localhost:8080/api/v1/accounts/transfer")`` colocamos la ruta completa y eso nos obliga a tener que
+> trabajar con estas dos instancias, por un lado, ejecutar previamente el Servidor de la Aplicación Backend y por otro
+> ejecutar el test de integración en su propio servidor de esa manera cada servidor se ejecutará en un puerto distinto,
+> el de nuestro backend en el puerto 8080 y el del test en uno aleatorio.
+
+
+``Con el proyecto real levantado y antes de ejecutar el test``
+
+![antes](./assets/antes.png)
+
+``Con el proyecto real levantado y después de ejecutar el test``
+
+![despues](./assets/despues.png)
+
+Por lo tanto, es importante tener los datos iniciados en la base de datos, **que no hayan sido modificados por otro
+proceso u otro test de integración,** ya que como vemos se está usando los datos reales de la base de datos, por eso
+**es importante partir de cero y reiniciar el servidor antes de ejecutar nuestros test de integración.**
+
+## Ejecutando nuestro test de integración - Única Instancia
+
+Cuando nuestras **pruebas de integración estén dentro del mismo proyecto backend**, es decir, dentro del mismo proyecto
+que contiene el controlador que queremos probar, **no es necesario tener levantado previamente el backend** para luego
+ejecutar el test de integración, tal como lo hicimos en el capítulo anterior. Para que esto sea así, debemos modificar
+el **uri()** del test para que tenga la ruta relativa al proyecto ``uri("/api/v1/accounts/transfer")`` y no la ruta
+completa como lo teníamos antes.
+
+Al colocar la **ruta relativa** en el test, por defecto, tanto el backend como el test de integración estarán en el
+mismo servidor y con el mismo puerto aleatorio generado.
+
+Modificando el método **uri()** nuestra clase de test de integración quedaría de esta manera:
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_transfer_amount_between_two_accounts() {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("100"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts/transfer") //<-- path relativo
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)
+                .exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.message").isNotEmpty()
+                .jsonPath("$.message").value(Matchers.is("transferencia exitosa"))
+                .jsonPath("$.message").value(message -> assertEquals("transferencia exitosa", message))
+                .jsonPath("$.message").isEqualTo("transferencia exitosa")
+                .jsonPath("$.transaction.accountIdOrigin").isEqualTo(dto.accountIdOrigin())
+                .jsonPath("$.datetime").value(datetime -> {
+                    LocalDateTime localDateTime = LocalDateTime.parse(datetime.toString());
+                    assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                });
+    }
+}
+````
+
+Ahora sí, **ejecutamos solo el test de integración** y como resultado veremos una ejecución exitosa en una sola
+instancia.
+
+![una-sola-instancia.png](./assets/una-sola-instancia.png)
+
+**NOTA**
+
+> Si nuestra aplicación backend está separada de nuestros test de integración, obviamente allí sí debemos usar la ruta
+> completa tal como lo hicimos en el apartado **Ejecutando nuestro test de integración - Instancias separadas**
