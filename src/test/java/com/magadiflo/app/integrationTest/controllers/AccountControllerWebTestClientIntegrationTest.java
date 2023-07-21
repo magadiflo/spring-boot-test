@@ -232,4 +232,37 @@ class AccountControllerWebTestClientIntegrationTest {
                     assertEquals(accountToSave.getBalance(), accountDB.getBalance());
                 });
     }
+
+    @Test
+    @Order(8)
+    void should_deleted_an_account() {
+        // Given
+        Long idToDelete = 1L;
+        this.client.get().uri("/api/v1/accounts")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Account.class)
+                .hasSize(4);
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.delete().uri("/api/v1/accounts/{id}", idToDelete)
+                .exchange();
+
+        // Then
+        response.expectStatus().isNoContent()
+                .expectBody().isEmpty();
+
+        this.client.get().uri("/api/v1/accounts")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Account.class)
+                .hasSize(3);
+
+        this.client.get().uri("/api/cuentas/{id}", idToDelete)
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(404)
+                .jsonPath("$.error").isEqualTo("Not Found");
+    }
 }

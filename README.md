@@ -2273,3 +2273,94 @@ class AccountControllerWebTestClientIntegrationTest {
     }
 }
 ````
+
+## Test de Integración: para el eliminar
+
+Para realizar el test de integración del eliminar, primero debemos implementar dicha funcionalidad:
+
+````java
+public interface IAccountService {
+    /* other methods */
+    Optional<Boolean> deleteAccountById(Long id);
+}
+````
+
+````java
+
+@Service
+public class AccountServiceImpl implements IAccountService {
+    /* omitted code */
+    @Override
+    @Transactional
+    public Optional<Boolean> deleteAccountById(Long id) {
+        return this.accountRepository.findById(id)
+                .map(accountDB -> {
+                    this.accountRepository.deleteById(accountDB.getId());
+                    return true;
+                });
+    }
+}
+````
+
+````java
+
+@RestController
+@RequestMapping(path = "/api/v1/accounts")
+public class AccountController {
+    /* omitted code */
+    @DeleteMapping(path = "/{id}")
+    public ResponseEntity<?> deleteAccount(@PathVariable Long id) {
+        return this.accountService.deleteAccountById(id)
+                .map(isDeleted -> ResponseEntity.noContent().build())
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+}
+````
+
+Listo, una vez implementada la funcionalidad del eliminar, toca realizar el test de integración:
+
+````java
+
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    @Order(8)
+    void should_deleted_an_account() {
+        // Given
+        Long idToDelete = 1L;
+        this.client.get().uri("/api/v1/accounts")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Account.class)
+                .hasSize(4);
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.delete().uri("/api/v1/accounts/{id}", idToDelete)
+                .exchange();
+
+        // Then
+        response.expectStatus().isNoContent()
+                .expectBody().isEmpty();
+
+        this.client.get().uri("/api/v1/accounts")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Account.class)
+                .hasSize(3);
+
+        this.client.get().uri("/api/cuentas/{id}", idToDelete)
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(404)
+                .jsonPath("$.error").isEqualTo("Not Found");
+    }
+}
+````
