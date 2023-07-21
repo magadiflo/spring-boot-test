@@ -7,8 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -21,11 +23,23 @@ public class AccountController {
         this.accountService = accountService;
     }
 
+    @GetMapping
+    public ResponseEntity<List<Account>> listAllAccounts() {
+        return ResponseEntity.ok(this.accountService.findAll());
+    }
+
     @GetMapping(path = "/{id}")
     public ResponseEntity<Account> details(@PathVariable Long id) {
         return this.accountService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping
+    public ResponseEntity<Account> saveAccount(@RequestBody Account account) {
+        Account accountDB = this.accountService.save(account);
+        URI accountURI = URI.create("/api/v1/accounts" + accountDB.getId());
+        return ResponseEntity.created(accountURI).body(accountDB);
     }
 
     @PostMapping(path = "/transfer")

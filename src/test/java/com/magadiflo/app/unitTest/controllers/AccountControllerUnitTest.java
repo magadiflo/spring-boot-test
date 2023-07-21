@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.magadiflo.app.controllers.AccountController;
 import com.magadiflo.app.data.DataTest;
+import com.magadiflo.app.models.Account;
 import com.magadiflo.app.models.dto.TransactionDTO;
 import com.magadiflo.app.services.IAccountService;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,6 +23,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -95,4 +98,26 @@ class AccountControllerUnitTest {
         assertEquals(LocalDate.now(), localDateTime.toLocalDate());
     }
 
+    @Test
+    void should_find_all_accounts() throws Exception {
+        // Given
+        List<Account> accountList = List.of(DataTest.account001().get(), DataTest.account002().get());
+        when(this.accountService.findAll()).thenReturn(accountList);
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/accounts"));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].person").value("Martín"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].balance").value(2000))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[1].person").value("Alicia"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[1].balance").value(1000))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.size()", Matchers.is(accountList.size())))
+                .andExpect(MockMvcResultMatchers.jsonPath("$", Matchers.hasSize(accountList.size())))
+                .andExpect(MockMvcResultMatchers.content().json(this.objectMapper.writeValueAsString(accountList)));
+
+        verify(this.accountService).findAll();
+    }
 }

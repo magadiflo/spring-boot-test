@@ -1399,3 +1399,97 @@ seleccionamos ``Run 'All Tests' with Coverage``. Se ejecutarán todos nuestros t
 finalmente mostrarnos el siguiente resultado:
 
 ![code-coverage.png](./assets/code-coverage.png)
+
+## Más Pruebas Unitarias con MockMvc - Listar
+
+Implementamos nuevos métodos a testear: **findAll() y save()**.
+
+````java
+public interface IAccountService {
+    List<Account> findAll();
+
+    Account save(Account account);
+    /* omitted other methods */
+}
+````
+
+````java
+
+@Service
+public class AccountServiceImpl implements IAccountService {
+    /* omitted code */
+
+    @Override
+    public List<Account> findAll() {
+        return this.accountRepository.findAll();
+    }
+
+    @Override
+    public Account save(Account account) {
+        return this.accountRepository.save(account);
+    }
+    /* omitted code */
+
+}
+````
+
+````java
+
+@RestController
+@RequestMapping(path = "/api/v1/accounts")
+public class AccountController {
+    /* omitted code */
+
+    @GetMapping
+    public ResponseEntity<List<Account>> listAllAccounts() {
+        return ResponseEntity.ok(this.accountService.findAll());
+    }
+
+    @PostMapping
+    public ResponseEntity<Account> saveAccount(@RequestBody Account account) {
+        Account accountDB = this.accountService.save(account);
+        URI accountURI = URI.create("/api/v1/accounts" + accountDB.getId());
+        return ResponseEntity.created(accountURI).body(accountDB);
+    }
+    /* omitted code */
+}
+````
+
+Ahora implementamos el test para probar que el endpoint nos retorne el listado de cuentas:
+
+````java
+
+@WebMvcTest(AccountController.class)
+class AccountControllerUnitTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @MockBean
+    private IAccountService accountService;
+
+    @Test
+    void should_find_all_accounts() throws Exception {
+        // Given
+        List<Account> accountList = List.of(DataTest.account001().get(), DataTest.account002().get());
+        when(this.accountService.findAll()).thenReturn(accountList);
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/accounts"));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].person").value("Martín"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].balance").value(2000))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[1].person").value("Alicia"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[1].balance").value(1000))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.size()", Matchers.is(accountList.size())))
+                .andExpect(MockMvcResultMatchers.jsonPath("$", Matchers.hasSize(accountList.size())))
+                .andExpect(MockMvcResultMatchers.content().json(this.objectMapper.writeValueAsString(accountList)));
+
+        verify(this.accountService).findAll();
+    }
+}
+````

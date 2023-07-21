@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -23,9 +24,19 @@ public class AccountServiceImpl implements IAccountService {
     }
 
     @Override
+    public List<Account> findAll() {
+        return this.accountRepository.findAll();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<Account> findById(Long id) {
         return this.accountRepository.findById(id);
+    }
+
+    @Override
+    public Account save(Account account) {
+        return this.accountRepository.save(account);
     }
 
     @Override
