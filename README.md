@@ -1391,3 +1391,11 @@ class AccountControllerUnitTest {
     }
 }
 ````
+
+## Ejecutando tests con cobertura de código (Code Coverage)
+
+Para ver la cobertura de los test realizados vamos a la **raíz del proyecto** y damos **clic secundario** y
+seleccionamos ``Run 'All Tests' with Coverage``. Se ejecutarán todos nuestros test, unitarios y de integración para
+finalmente mostrarnos el siguiente resultado:
+
+![code-coverage.png](./assets/code-coverage.png)
