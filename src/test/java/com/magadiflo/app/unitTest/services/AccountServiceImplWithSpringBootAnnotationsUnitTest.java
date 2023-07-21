@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -111,5 +112,37 @@ class AccountServiceImplWithSpringBootAnnotationsUnitTest {
         assertEquals("Martín", account1.getPerson());
         assertEquals("Martín", account2.getPerson());
         verify(this.accountRepository, times(2)).findById(1L);
+    }
+
+    @Test
+    void should_find_all_accounts() {
+        List<Account> accountsRepo = List.of(DataTest.account001().get(), DataTest.account002().get());
+        when(this.accountRepository.findAll()).thenReturn(accountsRepo);
+
+        List<Account> accounts = this.accountService.findAll();
+
+        assertFalse(accounts.isEmpty());
+        assertEquals(accountsRepo.size(), accounts.size());
+        assertTrue(accounts.contains(DataTest.account002().get()));
+        verify(this.accountRepository).findAll();
+    }
+
+    @Test
+    void should_save_an_account() {
+        Long idBD = 10L;
+        Account account = new Account(null, "Martín", new BigDecimal("2000"));
+        doAnswer(invocation -> {
+            Account accountDB = invocation.getArgument(0);
+            accountDB.setId(idBD);
+            return accountDB;
+        }).when(this.accountRepository).save(any(Account.class));
+
+        Account accountSaved = this.accountService.save(account);
+
+        assertNotNull(accountSaved);
+        assertNotNull(accountSaved.getId());
+        assertEquals(idBD, accountSaved.getId());
+        assertEquals(account.getPerson(), accountSaved.getPerson());
+        assertEquals(account.getBalance(), accountSaved.getBalance());
     }
 }
