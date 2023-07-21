@@ -1908,3 +1908,241 @@ class AccountControllerWebTestClientIntegrationTest {
     }
 }
 ````
+
+## Test de Integración: para el endpoint de details
+
+Nuestro nuevo método test evaluará el endpoint de detalles, para este caso usaremos el **jsonPath()** para hacer las
+comprobaciones:
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_find_an_account_with_jsonPath() throws JsonProcessingException {
+        // Given
+        Long id = 1L;
+        Account expectedAccount = new Account(id, "Martín", new BigDecimal("2000"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts/{id}", id).exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.person").isEqualTo(expectedAccount.getPerson())
+                .jsonPath("$.balance").isEqualTo(expectedAccount.getBalance().doubleValue())
+                .json(this.objectMapper.writeValueAsString(expectedAccount)); // Comparamos el json obtenido con un json esperado
+
+    }
+}
+````
+
+**NOTA**
+> Como hasta ahora tenemos 3 métodos test, dependiendo de cuál sea el orden que JUnit ejecute cada test veremos que la
+> base de datos se verá afectada, pudiendo afectar la ejecución de alguno de los test. A lo que me refiero es a que por
+> ejemplo en este último test para el usuario con id=1 se espera recibir 2000 como saldo, pero puede ser que el test
+> donde evaluamos las transacciones se ejecute antes modificando ese saldo, de tal forma que cuando le toque la hora de
+> ejecutar el nuestro test de detalle ya no se tendrá el saldo de 2000. Por lo tanto, habrá que ver la manera de cómo
+> manejar esa situación.
+
+Para ver lo que se menciona en la **NOTA** crearemos otro método de test similar al anterior, pero esta vez usaremos el
+**consumeWith()** que es otra forma de manejar las respuestas.
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_find_an_account_with_consumeWith() throws JsonProcessingException {
+        // Given
+        Long id = 2L;
+        Account expectedAccount = new Account(2L, "Alicia", new BigDecimal("1000"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts/{id}", id).exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody(Account.class)//Se espera recibir un json que tenga exactamente los mismos atributos que la clase Account
+                .consumeWith(result -> {
+                    Account accountDB = result.getResponseBody();
+
+                    assertNotNull(accountDB);
+                    assertEquals(expectedAccount, accountDB);
+                    assertEquals(expectedAccount.getPerson(), accountDB.getPerson());
+                    assertEquals(expectedAccount.getBalance(), accountDB.getBalance());
+                });
+
+    }
+}
+````
+
+Con este último método test tendríamos 4 test creados en nuestra clase de prueba. Si ejecutamos todos los métodos test
+veremos que, dependiendo del orden, uno de los test puede fallar, ya que estará esperando un dato distinto al devuelvo
+puesto que fue modificado por otro test. Eso lo vemos en la siguiente imagen:
+
+![integration-test-modifying.png](./assets/integration-test-modifying.png)
+
+> Entonces, como recomendación, cuando ejecutemos nuestras **pruebas de integración** donde algunos **test modifican
+> datos de la base de datos**, podríamos dar algún tipo de prioridad, es decir, definir que se ejecute un método
+> determinado, luego otro y así (darle un orden a los test), pero **solo en pruebas de integración**, para que un
+> método que se ejecutó antes no afecte a otro método que se ejecutará después.
+
+## Test de Integración - Agregando @Order a los @Test
+
+Como se vio en la sección anterior, cuando ejecutamos nuestros **tes de integración** los test puede verse afectados por
+la ejecución de otros test, así que lo recomendable será darle un orden a cada método test, pero solo cuando realizamos
+más de una **prueba de integración**.
+
+Utilizaremos las siguientes anotaciones:
+
+- **@TestMethodOrder** es una anotación de nivel de tipo que se usa para configurar un MethodOrderer para los métodos de
+  prueba de la clase de prueba anotada o la interfaz de prueba. En este contexto, el término "método de prueba" se
+  refiere a cualquier método anotado con @Test, @RepeatedTest, @ParameterizedTest, @TestFactory o @TestTemplate.
+
+
+- **@Order** es una anotación que se utiliza para configurar el orden en que el elemento anotado (es decir, campo,
+  método o clase) debe evaluarse o ejecutarse en relación con otros elementos de la misma categoría.
+  Cuando se usa con @RegisterExtension o @ExtendWith, la categoría se aplica a los campos de extensión. Cuando se usa
+  con MethodOrderer.OrderAnnotation, la categoría se aplica a los métodos de prueba. Cuando se usa con
+  ClassOrderer.OrderAnnotation, la categoría se aplica a las clases de prueba.
+
+A continuación se muestra toda la clase test con sus métodos test ordenados con la anotación **@Order()**, además con
+la modificación de los **datos esperados**:
+
+````java
+
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    @Order(1)
+    void should_transfer_amount_between_two_accounts() {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("100"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts/transfer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)
+                .exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.message").isNotEmpty()
+                .jsonPath("$.message").value(Matchers.is("transferencia exitosa"))
+                .jsonPath("$.message").value(message -> assertEquals("transferencia exitosa", message))
+                .jsonPath("$.message").isEqualTo("transferencia exitosa")
+                .jsonPath("$.transaction.accountIdOrigin").isEqualTo(dto.accountIdOrigin())
+                .jsonPath("$.datetime").value(datetime -> {
+                    LocalDateTime localDateTime = LocalDateTime.parse(datetime.toString());
+                    assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                });
+    }
+
+    @Test
+    @Order(2)
+    void should_transfer_amount_between_two_accounts_with_consumeWith() {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("20"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts/transfer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)
+                .exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .consumeWith(result -> {
+                    try {
+                        JsonNode jsonNode = this.objectMapper.readTree(result.getResponseBody());
+
+                        assertEquals("transferencia exitosa", jsonNode.path("message").asText());
+                        assertEquals(dto.accountIdOrigin(), jsonNode.path("transaction").path("accountIdOrigin").asLong());
+                        assertEquals(dto.amount().doubleValue(), jsonNode.path("transaction").path("amount").asDouble());
+
+                        LocalDateTime localDateTime = LocalDateTime.parse(jsonNode.path("datetime").asText());
+                        assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+    }
+
+    @Test
+    @Order(3)
+    void should_find_an_account_with_jsonPath() throws JsonProcessingException {
+        // Given
+        Long id = 1L;
+        Account expectedAccount = new Account(id, "Martín", new BigDecimal("1880"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts/{id}", id).exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.person").isEqualTo(expectedAccount.getPerson())
+                .jsonPath("$.balance").isEqualTo(expectedAccount.getBalance().doubleValue())
+                .json(this.objectMapper.writeValueAsString(expectedAccount));
+
+    }
+
+    @Test
+    @Order(4)
+    void should_find_an_account_with_consumeWith() throws JsonProcessingException {
+        // Given
+        Long id = 2L;
+        Account expectedAccount = new Account(2L, "Alicia", new BigDecimal("1120.00"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts/{id}", id).exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody(Account.class)//Se espera recibir un json que tenga exactamente los mismos atributos que la clase Account
+                .consumeWith(result -> {
+                    Account accountDB = result.getResponseBody();
+
+                    assertNotNull(accountDB);
+                    assertEquals(expectedAccount, accountDB);
+                    assertEquals(expectedAccount.getPerson(), accountDB.getPerson());
+                    assertEquals(expectedAccount.getBalance(), accountDB.getBalance());
+                });
+
+    }
+}
+````
+
+Ahora, si ejecutamos los test veremos que todos pasarán exitosamente. **El orden que se muestra en los resultados no
+interesa, lo importante es que sabemos en qué orden se están ejecutando los test por la anotación @Order**:
+
+![integration-test-order-method.png](./assets/integration-test-order-method.png)
+
+
