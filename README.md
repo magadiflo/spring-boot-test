@@ -612,6 +612,32 @@ objeto simulado (mock) de la dependencia correspondiente y lo inyectará en la c
 comportamiento de la dependencia y definir respuestas predefinidas para los métodos llamados durante la prueba.
 ``Generalmente, se usará esta anotación en otras capas de la aplicación, como el controlador.``
 
+## Agregando más Pruebas Unitarias al service - findAll()
+
+En este apartado se crea la prueba unitaria para el **AccountServiceImpl** su método **findAll()**. Esta prueba unitaria
+es la misma para los tres clases: **AccountServiceImplUnitTest, AccountServiceImplWithMockitoAnnotationsUnitTest, y
+para AccountServiceImplWithSpringBootAnnotationsUnitTest:**
+
+````java
+class AccountServiceImplUnitTest {
+
+    /* omitted properties and other tests */
+
+    @Test
+    void should_find_all_accounts() {
+        List<Account> accountsRepo = List.of(DataTest.account001().get(), DataTest.account002().get());
+        when(this.accountRepository.findAll()).thenReturn(accountsRepo);
+
+        List<Account> accounts = this.accountService.findAll();
+
+        assertFalse(accounts.isEmpty());
+        assertEquals(accountsRepo.size(), accounts.size());
+        assertTrue(accounts.contains(DataTest.account002().get()));
+        verify(this.accountRepository).findAll();
+    }
+}
+````
+
 # Sección 5: Spring Boot: Test de Repositorios (DataJpaTest)
 
 ---
