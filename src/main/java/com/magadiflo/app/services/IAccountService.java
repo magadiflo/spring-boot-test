@@ -18,4 +18,6 @@ public interface IAccountService {
     BigDecimal reviewBalance(Long accountId);
 
     void transfer(Long bankId, Long accountIdOrigen, Long accountIdDestination, BigDecimal amount);
+
+    Optional<Boolean> deleteAccountById(Long id);
 }

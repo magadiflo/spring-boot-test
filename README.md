@@ -1597,3 +1597,770 @@ class AccountControllerUnitTest {
     }
 }
 ````
+
+# Sección 7: Spring Boot: Test de integración de servicios rest con WebTestClient
+
+---
+
+## Pruebas de Integración: con WebClient
+
+### Introducción
+
+En esta sección **realizaremos pruebas reales** a nuestros endpoints, eso significa que **no usaremos MockMvc** para
+simular las peticiones como lo hicimos en la sección anterior, aunque, viendo el tutorial de
+[JavaGuides](https://www.javaguides.net/2022/03/spring-boot-integration-testing-mysql-crud-rest-api-tutorial.html#google_vignette),
+allí sí usa el **MockMvc** con ciertas configuraciones para que la petición realizada sean a los endpoints reales y no
+simulados, pero para nuestro caso usaremos los clientes HTTP proporcionados por Spring.
+
+Cada vez que hagamos las pruebas de integración de nuestros endpoints, **nuestro backend debe estar levantado**, por
+ejemplo en el puerto 8080; esto por una razón, nuestros tests van a consumir los endpoints reales, por lo tanto, estos
+deben estar funcionando.
+
+Para realizar estas pruebas de integración de nuestros endpoints, **usaremos clientes HTTP**, como: WebClient y
+RestTemplate; estos son los principales clientes que SpringBoot ofrece para consumir Servicios Rest. En esta sección
+trabajaremos con **WebClient**.
+
+> Siempre trabajaremos con un único cliente http para realizar pruebas de integración, ya sea **utilizando RestTemplate
+> o WebClient**
+
+### WebClient
+
+**Spring WebFlux incluye un cliente para realizar solicitudes HTTP.** WebClient tiene una API funcional y fluida basada
+en Reactor. Es completamente sin bloqueo, admite transmisión y se basa en los mismos códecs que también se utilizan para
+codificar y decodificar contenido de solicitud y respuesta en el lado del servidor.
+
+**WebClient** es un cliente HTTP de **Spring** que permite realizar solicitudes HTTP de manera reactiva y no bloqueante
+en aplicaciones basadas en Spring. Es una opción recomendada para nuevas aplicaciones y reemplaza gradualmente a
+RestTemplate en el ecosistema de Spring.
+
+### WebTestClient
+
+**WebTestClient es un cliente HTTP** diseñado para probar aplicaciones de servidor. **Envuelve el WebClient de Spring**
+y lo usa para realizar solicitudes, pero expone una fachada de prueba para verificar las respuestas. WebTestClient se
+puede utilizar para realizar pruebas HTTP de extremo a extremo. También se puede usar para probar aplicaciones Spring
+MVC y Spring WebFlux sin un servidor en ejecución a través de objetos de respuesta y solicitud de servidor simulados.
+
+Por lo tanto, **para trabajar con el cliente HTTP WebClient**, o para ser más precisos con **WebTestClient**,
+necesitamos agregar la siguiente dependencia:
+
+````xml
+
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-webflux</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+````
+
+**NOTA**
+> Observar que el **scope** de la dependencia de webflux lo colocamos en **test**, puesto que será usado en nuestra
+> aplicación solo para eso, realizar pruebas.
+
+### @SpringBootTest()
+
+Spring Boot proporciona esta anotación **(@SpringBootTest)** para realizar pruebas de integración. Esta anotación crea
+un contexto de aplicación y carga el contexto completo de la aplicación.
+
+**@SpringBootTest** arranca el contexto completo de la aplicación, lo que significa que podemos usar el **@Autowired**
+para poder usar **inyección de dependencia**. Inicia un servidor embebido, crea un entorno web y, a continuación,
+permite a los métodos **@Test** realizar pruebas de integración.
+
+### webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
+
+De forma predeterminada **@SpringBootTest** no inicia un servidor, necesitamos agregar el atributo **webEnvironment**
+para refinar aún más cómo se ejecutarán sus pruebas. Tiene varias opciones:
+
+- **MOCK(default)**, carga un contexto de aplicación web y proporciona un entorno web simulado.
+- **RANDOM_PORT**, carga un WebServerApplicationContext y **proporciona un entorno web real.** El servidor embebido se
+  inicia y escucha en un puerto aleatorio. **Este es el que se debe utilizar para la prueba de integración.**
+- **DEFINED_PORT**, carga un WebServerApplicationContext y proporciona un entorno web real.
+- **NONE**, carga un ApplicationContext usando SpringApplication, pero no proporciona ningún entorno web.
+
+## Creando nuestra clase de prueba de integración con WebTestClient
+
+Luego de haber visto los conceptos necesarios para entender lo que se usa en el código de test, procedo a mostrar el
+primer test de integración creado:
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_transfer_amount_between_two_accounts() {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("100"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("http://localhost:8080/api/v1/accounts/transfer") //(1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)     // (2)
+                .exchange();        // (3)
+
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.message").isNotEmpty()
+                .jsonPath("$.message").value(Matchers.is("transferencia exitosa"))
+                .jsonPath("$.message").value(message -> assertEquals("transferencia exitosa", message))
+                .jsonPath("$.message").isEqualTo("transferencia exitosa")
+                .jsonPath("$.transaction.accountIdOrigin").isEqualTo(dto.accountIdOrigin())
+                .jsonPath("$.datetime").value(datetime -> {
+                    LocalDateTime localDateTime = LocalDateTime.parse(datetime.toString());
+                    assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                });
+    }
+}
+````
+
+**DONDE**
+
+- **(1)** url completa donde se está ejecutando nuestro endpoint a ser testeado.
+- **(2)** el método **bodyValue()** por debajo convierte al objeto pasado en un JSON.
+- **(3)** el método **exchange()**, ejecuta el envío de la solicitud, lo que venga después del **exchange()** es la
+  respuesta.
+
+## Ejecutando nuestro test de integración - Instancias separadas
+
+Si **solo ejecutamos el test anterior, sin hacer nada más** observamos el siguiente resultado:
+
+![error-test-integracion-run.png](./assets/error-test-integracion-run.png)
+
+El error mostrado ``Connection refused: no further information: localhost/127.0.0.1:8080`` nos dice que no ha encontrado
+algún servidor ejecutándose en esa dirección. Eso tiene sentido, ya que **solo ejecutamos nuestra clase de test** sin
+haber hecho nada más.
+
+Lo que debemos realizar **antes de ejecutar el test es levantar nuestro proyecto real**, una vez levantado el proyecto
+real, allí recién ejecutaremos nuestro test. **Recordar que nuestro proyecto real está trabajando con MySQL así que
+también debemos tener levantado esa base de datos.**
+
+Una **vez tengamos levantado el proyecto real, vamos a nuestro test de integración y lo ejecutamos.** Nuestro test se
+levantará en su propio servidor y en otro puerto distinto al de la aplicación real, esto gracias al **RANDOM_PORT**.
+
+Observamos en la siguiente imagen que tenemos levantado nuestra aplicación real y además al ejecutar nuestro test de
+integración, este lo hace en otro servidor.
+
+![run-test-integracion.png](./assets/run-test-integracion.png)
+
+**NOTA**
+
+> Debemos ejecutar este test levantando estas dos instancias, ya que en el
+> ``uri("http://localhost:8080/api/v1/accounts/transfer")`` colocamos la ruta completa y eso nos obliga a tener que
+> trabajar con estas dos instancias, por un lado, ejecutar previamente el Servidor de la Aplicación Backend y por otro
+> ejecutar el test de integración en su propio servidor de esa manera cada servidor se ejecutará en un puerto distinto,
+> el de nuestro backend en el puerto 8080 y el del test en uno aleatorio.
+
+
+``Con el proyecto real levantado y antes de ejecutar el test``
+
+![antes](./assets/antes.png)
+
+``Con el proyecto real levantado y después de ejecutar el test``
+
+![despues](./assets/despues.png)
+
+Por lo tanto, es importante tener los datos iniciados en la base de datos, **que no hayan sido modificados por otro
+proceso u otro test de integración,** ya que como vemos se está usando los datos reales de la base de datos, por eso
+**es importante partir de cero y reiniciar el servidor antes de ejecutar nuestros test de integración.**
+
+## Ejecutando nuestro test de integración - Única Instancia
+
+Cuando nuestras **pruebas de integración estén dentro del mismo proyecto backend**, es decir, dentro del mismo proyecto
+que contiene el controlador que queremos probar, **no es necesario tener levantado previamente el backend** para luego
+ejecutar el test de integración, tal como lo hicimos en el capítulo anterior. Para que esto sea así, debemos modificar
+el **uri()** del test para que tenga la ruta relativa al proyecto ``uri("/api/v1/accounts/transfer")`` y no la ruta
+completa como lo teníamos antes.
+
+Al colocar la **ruta relativa** en el test, por defecto, tanto el backend como el test de integración estarán en el
+mismo servidor y con el mismo puerto aleatorio generado.
+
+Modificando el método **uri()** nuestra clase de test de integración quedaría de esta manera:
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_transfer_amount_between_two_accounts() {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("100"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts/transfer") //<-- path relativo
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)
+                .exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.message").isNotEmpty()
+                .jsonPath("$.message").value(Matchers.is("transferencia exitosa"))
+                .jsonPath("$.message").value(message -> assertEquals("transferencia exitosa", message))
+                .jsonPath("$.message").isEqualTo("transferencia exitosa")
+                .jsonPath("$.transaction.accountIdOrigin").isEqualTo(dto.accountIdOrigin())
+                .jsonPath("$.datetime").value(datetime -> {
+                    LocalDateTime localDateTime = LocalDateTime.parse(datetime.toString());
+                    assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                });
+    }
+}
+````
+
+Ahora sí, **ejecutamos solo el test de integración** y como resultado veremos una ejecución exitosa en una sola
+instancia. Además, de esta manera usamos la base de datos **h2** y **no la de MySQL**. Recordemos que en las
+dependencias del **pom.xml** configuramos la dependencia de **h2 con scope en test**. Por lo tanto, ahora usará los
+datos que estén poblados en la base de datos de **h2** o la que tengamos configurado en el **application.properties**
+de nuestro **/test/resources/application.properties**:
+
+![una-sola-instancia.png](./assets/una-sola-instancia.png)
+
+**NOTA**
+
+> Si nuestra aplicación backend está separada de nuestros test de integración, obviamente allí sí debemos usar la ruta
+> completa tal como lo hicimos en el apartado **Ejecutando nuestro test de integración - Instancias separadas**
+
+## Prueba de Integración - Usando .consumeWith()
+
+En el test anterior usamos el **jsonPath()** para comprobar los resultados esperados y actuales, tal como se ve en
+el siguiente extracto de código:
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+    /* omitted code */
+
+    @Test
+    void should_transfer_amount_between_two_accounts() {
+        /* omitted code */
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.message").isNotEmpty()
+                .jsonPath("$.message").value(Matchers.is("transferencia exitosa"))
+                .jsonPath("$.message").value(message -> assertEquals("transferencia exitosa", message))
+                .jsonPath("$.message").isEqualTo("transferencia exitosa")
+                .jsonPath("$.transaction.accountIdOrigin").isEqualTo(dto.accountIdOrigin())
+                .jsonPath("$.datetime").value(datetime -> {
+                    LocalDateTime localDateTime = LocalDateTime.parse(datetime.toString());
+                    assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                });
+
+    }
+}
+````
+
+Existe otra forma de realizar la misma comprobación y es usando el método **.consumeWith()**. El consumeWith() recibe
+dentro de su método una expresión lambda que le permitirá consumir la respuesta y hacer los asserts:
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_transfer_amount_between_two_accounts_with_consumeWith() {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("20"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts/transfer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)
+                .exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .consumeWith(result -> { //<-- Otra forma de poder realizar la comprobación
+                    try {
+                        JsonNode jsonNode = this.objectMapper.readTree(result.getResponseBody());
+
+                        assertEquals("transferencia exitosa", jsonNode.path("message").asText());
+                        assertEquals(dto.accountIdOrigin(), jsonNode.path("transaction").path("accountIdOrigin").asLong());
+                        assertEquals(dto.amount().doubleValue(), jsonNode.path("transaction").path("amount").asDouble());
+
+                        LocalDateTime localDateTime = LocalDateTime.parse(jsonNode.path("datetime").asText());
+                        assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+    }
+}
+````
+
+## Test de Integración: para el endpoint de details
+
+Nuestro nuevo método test evaluará el endpoint de detalles, para este caso usaremos el **jsonPath()** para hacer las
+comprobaciones:
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_find_an_account_with_jsonPath() throws JsonProcessingException {
+        // Given
+        Long id = 1L;
+        Account expectedAccount = new Account(id, "Martín", new BigDecimal("2000"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts/{id}", id).exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.person").isEqualTo(expectedAccount.getPerson())
+                .jsonPath("$.balance").isEqualTo(expectedAccount.getBalance().doubleValue())
+                .json(this.objectMapper.writeValueAsString(expectedAccount)); // Comparamos el json obtenido con un json esperado
+
+    }
+}
+````
+
+**NOTA**
+> Como hasta ahora tenemos 3 métodos test, dependiendo de cuál sea el orden que JUnit ejecute cada test veremos que la
+> base de datos se verá afectada, pudiendo afectar la ejecución de alguno de los test. A lo que me refiero es a que por
+> ejemplo en este último test para el usuario con id=1 se espera recibir 2000 como saldo, pero puede ser que el test
+> donde evaluamos las transacciones se ejecute antes modificando ese saldo, de tal forma que cuando le toque la hora de
+> ejecutar el nuestro test de detalle ya no se tendrá el saldo de 2000. Por lo tanto, habrá que ver la manera de cómo
+> manejar esa situación.
+
+Para ver lo que se menciona en la **NOTA** crearemos otro método de test similar al anterior, pero esta vez usaremos el
+**consumeWith()** que es otra forma de manejar las respuestas.
+
+````java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_find_an_account_with_consumeWith() throws JsonProcessingException {
+        // Given
+        Long id = 2L;
+        Account expectedAccount = new Account(2L, "Alicia", new BigDecimal("1000"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts/{id}", id).exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody(Account.class)//Se espera recibir un json que tenga exactamente los mismos atributos que la clase Account
+                .consumeWith(result -> {
+                    Account accountDB = result.getResponseBody();
+
+                    assertNotNull(accountDB);
+                    assertEquals(expectedAccount, accountDB);
+                    assertEquals(expectedAccount.getPerson(), accountDB.getPerson());
+                    assertEquals(expectedAccount.getBalance(), accountDB.getBalance());
+                });
+
+    }
+}
+````
+
+Con este último método test tendríamos 4 test creados en nuestra clase de prueba. Si ejecutamos todos los métodos test
+veremos que, dependiendo del orden, uno de los test puede fallar, ya que estará esperando un dato distinto al devuelvo
+puesto que fue modificado por otro test. Eso lo vemos en la siguiente imagen:
+
+![integration-test-modifying.png](./assets/integration-test-modifying.png)
+
+> Entonces, como recomendación, cuando ejecutemos nuestras **pruebas de integración** donde algunos **test modifican
+> datos de la base de datos**, podríamos dar algún tipo de prioridad, es decir, definir que se ejecute un método
+> determinado, luego otro y así (darle un orden a los test), pero **solo en pruebas de integración**, para que un
+> método que se ejecutó antes no afecte a otro método que se ejecutará después.
+
+## Test de Integración - Agregando @Order a los @Test
+
+Como se vio en la sección anterior, cuando ejecutamos nuestros **tes de integración** los test puede verse afectados por
+la ejecución de otros test, así que lo recomendable será darle un orden a cada método test, pero solo cuando realizamos
+más de una **prueba de integración**.
+
+Utilizaremos las siguientes anotaciones:
+
+- **@TestMethodOrder** es una anotación de nivel de tipo que se usa para configurar un MethodOrderer para los métodos de
+  prueba de la clase de prueba anotada o la interfaz de prueba. En este contexto, el término "método de prueba" se
+  refiere a cualquier método anotado con @Test, @RepeatedTest, @ParameterizedTest, @TestFactory o @TestTemplate.
+
+
+- **@Order** es una anotación que se utiliza para configurar el orden en que el elemento anotado (es decir, campo,
+  método o clase) debe evaluarse o ejecutarse en relación con otros elementos de la misma categoría.
+  Cuando se usa con @RegisterExtension o @ExtendWith, la categoría se aplica a los campos de extensión. Cuando se usa
+  con MethodOrderer.OrderAnnotation, la categoría se aplica a los métodos de prueba. Cuando se usa con
+  ClassOrderer.OrderAnnotation, la categoría se aplica a las clases de prueba.
+
+A continuación se muestra toda la clase test con sus métodos test ordenados con la anotación **@Order()**, además con
+la modificación de los **datos esperados**:
+
+````java
+
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    @Order(1)
+    void should_transfer_amount_between_two_accounts() {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("100"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts/transfer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)
+                .exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.message").isNotEmpty()
+                .jsonPath("$.message").value(Matchers.is("transferencia exitosa"))
+                .jsonPath("$.message").value(message -> assertEquals("transferencia exitosa", message))
+                .jsonPath("$.message").isEqualTo("transferencia exitosa")
+                .jsonPath("$.transaction.accountIdOrigin").isEqualTo(dto.accountIdOrigin())
+                .jsonPath("$.datetime").value(datetime -> {
+                    LocalDateTime localDateTime = LocalDateTime.parse(datetime.toString());
+                    assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                });
+    }
+
+    @Test
+    @Order(2)
+    void should_transfer_amount_between_two_accounts_with_consumeWith() {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("20"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts/transfer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)
+                .exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectBody()
+                .consumeWith(result -> {
+                    try {
+                        JsonNode jsonNode = this.objectMapper.readTree(result.getResponseBody());
+
+                        assertEquals("transferencia exitosa", jsonNode.path("message").asText());
+                        assertEquals(dto.accountIdOrigin(), jsonNode.path("transaction").path("accountIdOrigin").asLong());
+                        assertEquals(dto.amount().doubleValue(), jsonNode.path("transaction").path("amount").asDouble());
+
+                        LocalDateTime localDateTime = LocalDateTime.parse(jsonNode.path("datetime").asText());
+                        assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+    }
+
+    @Test
+    @Order(3)
+    void should_find_an_account_with_jsonPath() throws JsonProcessingException {
+        // Given
+        Long id = 1L;
+        Account expectedAccount = new Account(id, "Martín", new BigDecimal("1880"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts/{id}", id).exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.person").isEqualTo(expectedAccount.getPerson())
+                .jsonPath("$.balance").isEqualTo(expectedAccount.getBalance().doubleValue())
+                .json(this.objectMapper.writeValueAsString(expectedAccount));
+
+    }
+
+    @Test
+    @Order(4)
+    void should_find_an_account_with_consumeWith() throws JsonProcessingException {
+        // Given
+        Long id = 2L;
+        Account expectedAccount = new Account(2L, "Alicia", new BigDecimal("1120.00"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts/{id}", id).exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody(Account.class)//Se espera recibir un json que tenga exactamente los mismos atributos que la clase Account
+                .consumeWith(result -> {
+                    Account accountDB = result.getResponseBody();
+
+                    assertNotNull(accountDB);
+                    assertEquals(expectedAccount, accountDB);
+                    assertEquals(expectedAccount.getPerson(), accountDB.getPerson());
+                    assertEquals(expectedAccount.getBalance(), accountDB.getBalance());
+                });
+
+    }
+}
+````
+
+Ahora, si ejecutamos los test veremos que todos pasarán exitosamente. **El orden que se muestra en los resultados no
+interesa, lo importante es que sabemos en qué orden se están ejecutando los test por la anotación @Order**:
+
+![integration-test-order-method.png](./assets/integration-test-order-method.png)
+
+## Test de Integración: para el listar
+
+````java
+
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    @Order(5)
+    void should_find_all_accounts_with_jsonPath() {
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts").exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$").isArray()
+                .jsonPath("$").value(Matchers.hasSize(2))
+                .jsonPath("$.size()").isEqualTo(2)
+                .jsonPath("$[0].id").isEqualTo(1)
+                .jsonPath("$[0].person").isEqualTo("Martín")
+                .jsonPath("$[0].balance").isEqualTo(1880)
+                .jsonPath("$[1].id").isEqualTo(2)
+                .jsonPath("$[1].person").isEqualTo("Alicia")
+                .jsonPath("$[1].balance").isEqualTo(1120);
+    }
+
+    @Test
+    @Order(5)
+    void should_find_all_accounts_with_consumeWith() {
+        // When
+        WebTestClient.ResponseSpec response = this.client.get().uri("/api/v1/accounts").exchange();
+
+        // Then
+        response.expectStatus().isOk()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBodyList(Account.class) // Como es del tipo expectBodyList, nos da la posibilidad de usar los métodos (1)
+                .consumeWith(result -> {
+                    List<Account> accountListDB = result.getResponseBody();
+
+                    assertNotNull(accountListDB);
+                    assertFalse(accountListDB.isEmpty());
+                    assertEquals(2, accountListDB.size());
+                    assertEquals(1L, accountListDB.get(0).getId());
+                    assertEquals("Martín", accountListDB.get(0).getPerson());
+                    assertEquals(1880D, accountListDB.get(0).getBalance().doubleValue());
+                    assertEquals(2L, accountListDB.get(1).getId());
+                    assertEquals("Alicia", accountListDB.get(1).getPerson());
+                    assertEquals(1120D, accountListDB.get(1).getBalance().doubleValue());
+                })
+                .hasSize(2)                     // <-- (1)
+                .value(Matchers.hasSize(2));    // <-- (1) y otros métodos más.
+    }
+}
+````
+
+## Test de Integración: para el guardar
+
+````java
+
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    @Order(6)
+    void should_save_an_account_with_jsonPath() {
+        // Given
+        Long idDB = 3L;
+        Account accountToSave = new Account(null, "María", new BigDecimal("5000"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(accountToSave)
+                .exchange();
+
+        // Then
+        response.expectStatus().isCreated()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectHeader().location("/api/v1/accounts/" + idDB)
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(idDB)
+                .jsonPath("$.person").value(Matchers.is(accountToSave.getPerson()))
+                .jsonPath("$.balance").isEqualTo(accountToSave.getBalance());
+    }
+
+    @Test
+    @Order(7)
+    void should_save_an_account_with_consumeWith() {
+        // Given
+        Long idDB = 4L;
+        Account accountToSave = new Account(null, "Livved", new BigDecimal("3000"));
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.post().uri("/api/v1/accounts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(accountToSave)
+                .exchange();
+
+        // Then
+        response.expectStatus().isCreated()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectHeader().location("/api/v1/accounts/" + idDB)
+                .expectBody(Account.class)
+                .consumeWith(result -> {
+                    Account accountDB = result.getResponseBody();
+
+                    assertNotNull(accountDB);
+                    assertEquals(idDB, accountDB.getId());
+                    assertEquals(accountToSave.getPerson(), accountDB.getPerson());
+                    assertEquals(accountToSave.getBalance(), accountDB.getBalance());
+                });
+    }
+}
+````
+
+## Test de Integración: para el eliminar
+
+Para realizar el test de integración del eliminar, primero debemos implementar dicha funcionalidad:
+
+````java
+public interface IAccountService {
+    /* other methods */
+    Optional<Boolean> deleteAccountById(Long id);
+}
+````
+
+````java
+
+@Service
+public class AccountServiceImpl implements IAccountService {
+    /* omitted code */
+    @Override
+    @Transactional
+    public Optional<Boolean> deleteAccountById(Long id) {
+        return this.accountRepository.findById(id)
+                .map(accountDB -> {
+                    this.accountRepository.deleteById(accountDB.getId());
+                    return true;
+                });
+    }
+}
+````
+
+````java
+
+@RestController
+@RequestMapping(path = "/api/v1/accounts")
+public class AccountController {
+    /* omitted code */
+    @DeleteMapping(path = "/{id}")
+    public ResponseEntity<?> deleteAccount(@PathVariable Long id) {
+        return this.accountService.deleteAccountById(id)
+                .map(isDeleted -> ResponseEntity.noContent().build())
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+}
+````
+
+Listo, una vez implementada la funcionalidad del eliminar, toca realizar el test de integración:
+
+````java
+
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+
+    @Autowired
+    private WebTestClient client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    @Order(8)
+    void should_deleted_an_account() {
+        // Given
+        Long idToDelete = 1L;
+        this.client.get().uri("/api/v1/accounts")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Account.class)
+                .hasSize(4);
+
+        // When
+        WebTestClient.ResponseSpec response = this.client.delete().uri("/api/v1/accounts/{id}", idToDelete)
+                .exchange();
+
+        // Then
+        response.expectStatus().isNoContent()
+                .expectBody().isEmpty();
+
+        this.client.get().uri("/api/v1/accounts")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(Account.class)
+                .hasSize(3);
+
+        this.client.get().uri("/api/cuentas/{id}", idToDelete)
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(404)
+                .jsonPath("$.error").isEqualTo("Not Found");
+    }
+}
+````

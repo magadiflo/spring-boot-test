@@ -77,4 +77,14 @@ public class AccountServiceImpl implements IAccountService {
         this.accountRepository.save(accountDestination);
         this.bankRepository.save(bank);
     }
+
+    @Override
+    @Transactional
+    public Optional<Boolean> deleteAccountById(Long id) {
+        return this.accountRepository.findById(id)
+                .map(accountDB -> {
+                    this.accountRepository.deleteById(accountDB.getId());
+                    return true;
+                });
+    }
 }
