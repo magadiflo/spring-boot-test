@@ -55,4 +55,11 @@ public class AccountController {
 
         return ResponseEntity.ok(response);
     }
+
+    @DeleteMapping(path = "/{id}")
+    public ResponseEntity<?> deleteAccount(@PathVariable Long id) {
+        return this.accountService.deleteAccountById(id)
+                .map(isDeleted -> ResponseEntity.noContent().build())
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 }
