@@ -2722,3 +2722,92 @@ class AccountControllerTestRestTemplateIntegrationTest {
 }
 ````
 
+## Excluir clases de prueba mediante tag
+
+Puede ser que tengamos un caso donde queremos correr todos los test exceptuando algunos, para esa situación
+podríamos apoyarnos de los **@Tag()**. Anotamos las clases de prueba con **@Tag()**, le damos un valor, configuramos
+nuestro ide para excluir el tag y listo:
+
+````java
+
+@Tag(value = "integration_test_webtestclient")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+    /* omitted code */
+}
+````
+
+Luego configuramos nuestro **IDE IntelliJ IDEA**:
+
+- Edit configurations...
+- Seleccionar el combo box la opción **tags**
+- En la casilla del costado agregamos el nombre del tag, **como queremos excluir usaremos el signo de admiración !:**
+  Ejemplo: ``!integration_test_webtestclient``
+
+## Ejecutando tests desde consola
+
+- Mediante cmd nos posicionamos en la raíz del proyecto y ejecutamos el comando para ejecutar todos los test:
+  ``mvnw test``
+- Ahora, si quisiéramos excluir alguna prueba podríamos usar el @Tag() que debería estar anotado en la clase de prueba.
+  Por ejemplo, imaginemos que una de nuestras clases de prueba está anotado con el siguiente tag
+  **@Tag(value = "integration_test_webtestclient")**, entonces para excluir esta clase de prueba podríamos usar el
+  siguiente comando en la consola: ``mvnw test -Dgroups="!integration_test_webtestclient"``
+
+En nuestro caso sí necesitamos **excluir una clase de prueba**, veamos la siguiente imagen:
+
+![exclude-test.png](./assets/exclude-test.png)
+
+Como observamos en la imagen anterior, al ejecutar todos nuestros test mediante consola, la clase de prueba
+**AccountControllerWebTestClientIntegrationTest** nos arroja errores en sus comprobaciones. Entonces para solucionarlo
+podemos **excluir**
+esta clase de prueba, ya que tenemos la clase de prueba **AccountControllerTestRestTemplateIntegrationTest** que
+prueba las mismas cosas pero usando su propio archivo sql. Entonces para ejecutar el test completo excluyendo
+la clase de test mencionada, ejecutamos:
+
+````bash
+mvnw test -Dgroups="!integration_test_webtestclient"
+````
+
+**NOTA**
+> No he investigado por qué ocurre este error en consola, pero supongo que es porque la clase está usando el archivo
+> **import.sql** para hacer los test, pero también tenemos otras clases test que usan el mismo archivo, eso provoca que
+> las afirmaciones no sean correctas, ya que los datos son modificados por varias clases.
+>
+> Aunque, si ejecutamos todos los test desde el **IDE IntelliJ IDEA** no ocurre el mismo problema, allí sí se ejecutan
+> todos los test exitosamente.
+
+## Solución al error de caracteres especiales en consola
+
+Puede que al ejecutar el test mediante consola nos salgan errores producto de la codificación de caracteres, tal como se
+ve en la siguiente imagen:
+
+![error-caracteres-consola.png](./assets/error-caracteres-consola.png)
+
+Entonces, para solucionar esto, debemos cambiar el tipo de codificación de caractereres, **solo de los archivos que usen
+los caracteres especiales, ya que ellos son los que provocan este error**, como el **import.sql y el
+test-account-data.sql** ubicados en **/test/resources**.
+
+![scripts-con-caracteres-especiales.png](./assets/scripts-con-caracteres-especiales.png)
+
+Si nuestros test usan el archivo **import.sql** del **/main/resources/** y este también contiene caracteres especiales,
+por consiguiente también deberíamos hacer lo mismo:
+
+Para cambiar el tipo de codificación hacemos lo siguiente:
+
+- Seleccionamos el archivo a cambiar la codificación, por ejemplo **import.sql** luego vamos a
+  ``File/File Properties/File Encoding``
+- Seleccionamos **ISO-8859-1** y clic en **Convert**
+- Para comprobar que se realizó el cambio, abrimos el archivo **import.sql** y observamos en la parte inferior el tipo
+  de codificación del archivo, tal como se ve en la siguiente imagen:
+
+  ![cambio-caracteres.png](./assets/cambio-caracteres.png)
+
+Listo, ahora ejecutamos los test nuevamente y todo debería funcionar correctamente:
+
+![test-running-successfully.png](./assets/test-running-successfully.png)
+
+**IMPORTANTE**
+
+> Si vamos a volver a realizar los test desde el **IDE IntelliJ IDEA**, debemos convertir los archivos a sus caracteres
+> originales **(UTF-8)** sino las pruebas ejecutadas con el IDE fallarán.
