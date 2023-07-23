@@ -2563,3 +2563,8 @@ class AccountControllerTestRestTemplateIntegrationTest {
     }
 }
 ````
+
+**IMPORTANTE**
+> Esta forma de utilizar la ruta completa (absoluta) también aplica para la sección donde vimos la realización de
+> Pruebas de Integración con WebTestClient.
+
