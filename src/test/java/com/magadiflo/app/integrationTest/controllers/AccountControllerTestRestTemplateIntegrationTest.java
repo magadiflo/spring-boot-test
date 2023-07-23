@@ -57,6 +57,25 @@ class AccountControllerTestRestTemplateIntegrationTest {
         assertEquals(1000D, account.getBalance().doubleValue());
     }
 
+    @Test
+    void should_find_all_accounts() throws Exception {
+        ResponseEntity<Account[]> response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts"), Account[].class);
+        Account[] accountsDB = response.getBody();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertNotNull(accountsDB);
+        assertEquals(4, accountsDB.length);
+        assertEquals(1L, accountsDB[0].getId());
+        assertEquals("Andrés", accountsDB[0].getPerson());
+        assertEquals(1000D, accountsDB[0].getBalance().doubleValue());
+
+        JsonNode jsonNode = this.objectMapper.readTree(this.objectMapper.writeValueAsBytes(accountsDB));
+        assertEquals(1L, jsonNode.get(0).path("id").asLong());
+        assertEquals("Andrés", jsonNode.get(0).path("person").asText());
+        assertEquals(1000D, jsonNode.get(0).path("balance").asDouble());
+    }
+
     private String createAbsolutePath(String uri) {
         return String.format("http://localhost:%d%s", this.port, uri);
     }
