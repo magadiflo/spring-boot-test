@@ -710,7 +710,7 @@ Configuramos nuestra base de datos **h2** en el **application.properties** de nu
 
 ````properties
 # Datasource
-spring.datasource.url=jdbc:h2:mem:db;DB_CLOSE_DELAY=-1
+spring.datasource.url=jdbc:h2:mem:db_test;DB_CLOSE_ON_EXIT=FALSE
 spring.datasource.username=sa
 spring.datasource.password=sa
 spring.datasource.driver-class-name=org.h2.Driver
@@ -719,6 +719,14 @@ spring.jpa.hibernate.ddl-auto=create-drop
 spring.jpa.show-sql=true
 spring.jpa.properties.hibernate.format_sql=true
 ````
+
+**DONDE**
+
+- **db_test**, nombre que le damos a la base de datos que se creará en memoria o a la que se conectará la aplicación.
+- **;DB_CLOSE_ON_EXIT=FALSE**, esta parte de la URL es una opción específica de H2. Con esta configuración, se está
+  indicando que la base de datos no se cerrará automáticamente al salir de la aplicación Spring Boot. Esto permite que
+  la base de datos permanezca en memoria incluso después de que la aplicación se detenga, lo que puede ser **útil para
+  fines de depuración y pruebas.**
 
 **NOTA**
 
@@ -2364,3 +2372,442 @@ class AccountControllerWebTestClientIntegrationTest {
     }
 }
 ````
+
+# Sección 8: Spring Boot: Test de Integración de Servicios Rest con TestRestTemplate
+
+---
+
+## Pruebas de Integración con TestRestTemplate
+
+Crearemos nuestra clase de prueba a partir del controlador **AccountController** presionando las teclas
+``Ctrl + Shift + T``. Las configuraciones serán las mismas que utilizamos en las pruebas de integración usando
+**WebClient**, con algunas diferencias:
+
+1. Como ahora utilizaremos **TestRestTemplate** necesitamos definirlo como una propiedad que será inyectada con
+   @Autowired.
+2. En las **Pruebas de Integración usando WebTestClient** usábamos la anotación **@Order()** con la anotación
+   **@TestMethodOrder()** a nivel de la clase, con la finalidad de determinar el orden de ejecución de los test, con
+   esto evitábamos que la ejecución de un test que modificaba la base de datos no afectara la ejecución de otro test que
+   usaba los mismos datos. Pues bien, en esta nueva sección ya no usaremos esas anotaciones para ordenar los test,
+   sino más bien, **usaremos la anotación @Sql() junto con algunos scripts SQL para tener los datos de pruebas siempre
+   en un mismo estado**.
+
+### TestRestTemplate
+
+Alternativa conveniente de RestTemplate que **es adecuada para pruebas de integración.** TestRestTemplate es tolerante a
+fallas. Esto significa que 4xx y 5xx no generan una excepción y, en cambio, pueden detectarse a través de la entidad de
+respuesta y su código de estado.
+
+Una TestRestTemplate puede llevar opcionalmente encabezados de autenticación básicos. Si Apache Http Client 4.3.2 o
+superior está disponible (recomendado), se utilizará como cliente y, de forma predeterminada, se configurará para
+ignorar las cookies y los redireccionamientos.
+
+**Nota: para evitar problemas de inyección, esta clase no extiende intencionadamente RestTemplate. Si necesita acceder
+al RestTemplate subyacente, use getRestTemplate().**
+
+**Si está utilizando la anotación @SpringBootTest con un servidor integrado, un TestRestTemplate está disponible
+automáticamente y se puede @Autowired en su prueba.** Si necesita personalizaciones (por ejemplo, para agregar
+convertidores de mensajes adicionales), use RestTemplateBuilder @Bean.
+
+### [Ejecutando Scripts SQL](https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/executing-sql.html#testcontext-executing-sql-declaratively-script-detection)
+
+Cuando se escriben **pruebas de integración** en una base de datos relacional, **suele ser beneficioso ejecutar
+secuencias de comandos SQL para modificar el esquema de la base de datos o insertar datos de prueba en las tablas.** El
+módulo spring-jdbc brinda soporte para inicializar una base de datos incrustada o existente mediante la ejecución de
+secuencias de comandos SQL cuando se carga Spring ApplicationContext.
+
+Aunque es muy útil inicializar una base de datos para probar una vez que se carga ApplicationContext, a veces es
+esencial poder **modificar la base de datos durante las pruebas de integración.**
+
+### Ejecutar scripts SQL declarativamente con @Sql
+
+Puede declarar la **anotación @Sql en una clase de prueba o método de prueba** para configurar instrucciones SQL
+individuales o las rutas de recursos a **scripts SQL que deben ejecutarse en una base de datos determinada antes o
+después de un método de prueba de integración.**
+
+### Semántica de recursos de ruta
+
+Cada ruta se interpreta como un recurso Spring:
+
+- Una ruta simple, por ejemplo: **"schema.sql"** se trata como un recurso de ruta de clase **relativo al paquete en el
+  que se define la clase de prueba.**
+- Una ruta que comienza con una barra inclinada **se trata como un recurso de ruta de clase absoluta**, por ejemplo:
+  **"/org/example/schema.sql".**
+- Una ruta que hace referencia a una URL, por ejemplo: **una ruta con el prefijo classpath:, file:, http:**, se carga
+  utilizando el protocolo de recursos especificado.
+
+Si queremos ubicar nuestros Scripts SQL en el directorio **/test/resources** debemos usar la siguiente semántica de
+recursos de ruta:
+
+````
+scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}
+````
+
+En nuestro caso, definiremos dos scripts sql, el primero hará un truncate de toda la tabla **accounts**, pero según
+revisé, ese truncate no reinicia el contador de incremento de los ids, así que por eso se hace uso de un ALTER TABLE
+para reiniciar la columna id a 1.
+
+El segundo script puebla la tabla **accounts** y también la de **banks**. **Estos dos scripts se ejecutarán antes de
+cada método de prueba individual.**
+
+````
+# test-account-cleanup.sql
+#
+TRUNCATE TABLE accounts;
+ALTER TABLE accounts ALTER COLUMN id RESTART WITH 1;
+````
+
+````
+# test-account-data.sql
+#
+INSERT INTO banks(name, total_transfers) VALUES('Banco de la Nación', 0);
+INSERT INTO banks(name, total_transfers) VALUES('Banco BBVA', 0);
+INSERT INTO banks(name, total_transfers) VALUES('Banco BCP', 0);
+
+INSERT INTO accounts(person, balance) VALUES('Andrés', 1000);
+INSERT INTO accounts(person, balance) VALUES('Pedro', 2000);
+INSERT INTO accounts(person, balance) VALUES('Liz', 3000);
+INSERT INTO accounts(person, balance) VALUES('Karen', 4000);
+````
+
+Para que nuestros scripts y declaraciones SQL configurados en la anotación **@Sql**, se ejecuten **antes que el método
+de prueba correspondiente**, debemos usar la siguiente configuración:
+
+````
+executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+````
+
+En resumen, con esta anotación
+``@Sql(scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)``,
+estás indicando que antes de ejecutar cada método de prueba, se ejecuten los scripts SQL mencionados. Esto puede ser
+útil para preparar la base de datos con datos de prueba o limpiarla después de la ejecución de cada prueba, asegurando
+que las pruebas se ejecuten en un estado predecible y limpio.
+
+## Prueba de Integración con TestRestTemplate: primer test endpoint transfer
+
+````java
+
+@Sql(scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerTestRestTemplateIntegrationTest {
+    @Autowired
+    private TestRestTemplate client;
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Test
+    void should_transfer_amount_between_accounts() throws JsonProcessingException {
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("500"));
+
+        ResponseEntity<String> response = this.client.postForEntity("/api/v1/accounts/transfer", dto, String.class);
+        String jsonString = response.getBody();
+        JsonNode jsonNode = this.objectMapper.readTree(jsonString);
+
+        assertNotNull(jsonString);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertEquals("transferencia exitosa", jsonNode.get("message").asText());
+    }
+}
+````
+
+## Ejecutando nuestro test de integración - Única Instancia y Ruta Absoluta
+
+En el apartado **Ejecutando nuestro test de integración - Única Instancia** decíamos que para poder ejecutar nuestros
+tests de integración sin la necesidad de iniciar nuestro backend previamente, debíamos reemplazar nuestro path absoluto
+``uri("http://localhost:8080/api/v1/accounts/transfer")`` por un path relativo ``uri("/api/v1/accounts/transfer")``, de
+esta manera solo ejecutábamos los test de integración y por debajo se levantaba nuestro backend en el **mismo puerto
+aleatorio** definido para las pruebas.
+
+Entonces, **¿cómo puedo colocar la ruta absoluta, pero ejecutar solo los test de integración sin la necesidad de
+levantar previamente el backend?** Eso sería posible **averiguando el puerto aleatorio que se genera** cuando se ejecuta
+las pruebas y eso lo podemos hacer utilizando la anotación ``@LocalServerPort``.
+
+### @LocalServerPort
+
+Anotación en el nivel de parámetro de campo o método/constructor que **inyecta el puerto del servidor HTTP que se asignó
+en tiempo de ejecución.** Proporciona una **alternativa conveniente para @Value("${local.server.port}").**
+
+Listo, con esa explicación previa, vamos a crear ahora una **(1) variable donde utilizaremos la anotación
+@LocalServerPort** para inyectar el puerto asignado en tiempo de ejecución y luego **(2) crearemos un método que nos
+devolverá la ruta completa**, esto último es para poder reutilizar el código:
+
+````java
+
+@Sql(scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerTestRestTemplateIntegrationTest {
+    @Autowired
+    private TestRestTemplate client;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @LocalServerPort                                        //<-- (1) Inyecta el puerto asignado en tiempo de ejecución
+    private int port;
+
+    @Test
+    void should_transfer_amount_between_accounts() throws JsonProcessingException {
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("500"));
+
+        ResponseEntity<String> response = this.client.postForEntity(this.createAbsolutePath("/api/v1/accounts/transfer"), dto, String.class);
+        String jsonString = response.getBody();
+        JsonNode jsonNode = this.objectMapper.readTree(jsonString);
+
+        assertNotNull(jsonString);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertEquals("transferencia exitosa", jsonNode.get("message").asText());
+    }
+
+    private String createAbsolutePath(String uri) {          //<-- (2) Retorna el path absoluto con el puerto aleatorio
+        return String.format("http://localhost:%d%s", this.port, uri);
+    }
+}
+````
+
+**IMPORTANTE**
+> Esta forma de utilizar la ruta completa (absoluta) también aplica para la sección donde vimos la realización de
+> Pruebas de Integración con WebTestClient.
+
+## Prueba de Integración con TestRestTemplate: para el detalle
+
+````java
+
+@Sql(scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerTestRestTemplateIntegrationTest {
+    @Autowired
+    private TestRestTemplate client;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @LocalServerPort
+    private int port;
+
+    @Test
+    void should_find_an_account() {
+        ResponseEntity<Account> response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts/1"), Account.class);
+        Account account = response.getBody();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertNotNull(account);
+        assertEquals(1L, account.getId());
+        assertEquals("Andrés", account.getPerson());
+        assertEquals(1000D, account.getBalance().doubleValue());
+    }
+
+    private String createAbsolutePath(String uri) {
+        return String.format("http://localhost:%d%s", this.port, uri);
+    }
+}
+````
+
+## Prueba de Integración con TestRestTemplate: para el listar
+
+````java
+
+@Sql(scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerTestRestTemplateIntegrationTest {
+    @Autowired
+    private TestRestTemplate client;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @LocalServerPort
+    private int port;
+
+    @Test
+    void should_find_all_accounts() throws Exception {
+        ResponseEntity<Account[]> response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts"), Account[].class);
+        Account[] accountsDB = response.getBody();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertNotNull(accountsDB);
+        assertEquals(4, accountsDB.length);
+        assertEquals(1L, accountsDB[0].getId());
+        assertEquals("Andrés", accountsDB[0].getPerson());
+        assertEquals(1000D, accountsDB[0].getBalance().doubleValue());
+
+        JsonNode jsonNode = this.objectMapper.readTree(this.objectMapper.writeValueAsBytes(accountsDB));
+        assertEquals(1L, jsonNode.get(0).path("id").asLong());
+        assertEquals("Andrés", jsonNode.get(0).path("person").asText());
+        assertEquals(1000D, jsonNode.get(0).path("balance").asDouble());
+    }
+
+    private String createAbsolutePath(String uri) {
+        return String.format("http://localhost:%d%s", this.port, uri);
+    }
+}
+````
+
+## Prueba de Integración con TestRestTemplate: para el guardar
+
+````java
+
+@Sql(scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerTestRestTemplateIntegrationTest {
+    @Autowired
+    private TestRestTemplate client;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @LocalServerPort
+    private int port;
+
+    @Test
+    void should_save_an_account() {
+        Account accountToSave = new Account(null, "Nophy", new BigDecimal("4000"));
+        ResponseEntity<Account> response = this.client.postForEntity(this.createAbsolutePath("/api/v1/accounts"), accountToSave, Account.class);
+        Account accountDB = response.getBody();
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertNotNull(accountDB);
+        assertEquals(5L, accountDB.getId());
+        assertEquals("Nophy", accountDB.getPerson());
+        assertEquals(4000D, accountDB.getBalance().doubleValue());
+    }
+}
+````
+
+## Prueba de Integración con TestRestTemplate: para el eliminar
+
+````java
+
+@Sql(scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerTestRestTemplateIntegrationTest {
+    @Autowired
+    private TestRestTemplate client;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @LocalServerPort
+    private int port;
+
+    @Test
+    void should_delete_an_account() {
+        ResponseEntity<Account[]> response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts"), Account[].class);
+        Account[] accountsDB = response.getBody();
+        assertNotNull(accountsDB);
+        assertEquals(4, accountsDB.length);
+
+        this.client.delete(this.createAbsolutePath("/api/v1/accounts/{id}"), Collections.singletonMap("id", 1));
+
+        response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts"), Account[].class);
+        accountsDB = response.getBody();
+        assertNotNull(accountsDB);
+        assertEquals(3, accountsDB.length);
+        ResponseEntity<Account> resp = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts/1"), Account.class);
+        assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
+    }
+
+    @Test
+    void should_delete_an_account_with_exchange() {
+        ResponseEntity<Account[]> response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts"), Account[].class);
+        Account[] accountsDB = response.getBody();
+        assertNotNull(accountsDB);
+        assertEquals(4, accountsDB.length);
+
+        ResponseEntity<Void> responseExchange = this.client.exchange(this.createAbsolutePath("/api/v1/accounts/{id}"),
+                HttpMethod.DELETE, null, Void.class, Collections.singletonMap("id", 1));
+
+        assertEquals(HttpStatus.NO_CONTENT, responseExchange.getStatusCode());
+        assertFalse(responseExchange.hasBody());
+
+        response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts"), Account[].class);
+        accountsDB = response.getBody();
+        assertNotNull(accountsDB);
+        assertEquals(3, accountsDB.length);
+    }
+}
+````
+
+## Excluir clases de prueba mediante tag
+
+Puede ser que tengamos un caso donde queremos correr todos los test exceptuando algunos, para esa situación
+podríamos apoyarnos de los **@Tag()**. Anotamos las clases de prueba con **@Tag()**, le damos un valor, configuramos
+nuestro ide para excluir el tag y listo:
+
+````java
+
+@Tag(value = "integration_test_webtestclient")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerWebTestClientIntegrationTest {
+    /* omitted code */
+}
+````
+
+Luego configuramos nuestro **IDE IntelliJ IDEA**:
+
+- Edit configurations...
+- Seleccionar el combo box la opción **tags**
+- En la casilla del costado agregamos el nombre del tag, **como queremos excluir usaremos el signo de admiración !:**
+  Ejemplo: ``!integration_test_webtestclient``
+
+## Ejecutando tests desde consola
+
+- Mediante cmd nos posicionamos en la raíz del proyecto y ejecutamos el comando para ejecutar todos los test:
+  ``mvnw test``
+- Ahora, si quisiéramos excluir alguna prueba podríamos usar el @Tag() que debería estar anotado en la clase de prueba.
+  Por ejemplo, imaginemos que una de nuestras clases de prueba está anotado con el siguiente tag
+  **@Tag(value = "integration_test_webtestclient")**, entonces para excluir esta clase de prueba podríamos usar el
+  siguiente comando en la consola: ``mvnw test -Dgroups="!integration_test_webtestclient"``
+
+En nuestro caso sí necesitamos **excluir una clase de prueba**, veamos la siguiente imagen:
+
+![exclude-test.png](./assets/exclude-test.png)
+
+Como observamos en la imagen anterior, al ejecutar todos nuestros test mediante consola, la clase de prueba
+**AccountControllerWebTestClientIntegrationTest** nos arroja errores en sus comprobaciones. Entonces para solucionarlo
+podemos **excluir**
+esta clase de prueba, ya que tenemos la clase de prueba **AccountControllerTestRestTemplateIntegrationTest** que
+prueba las mismas cosas pero usando su propio archivo sql. Entonces para ejecutar el test completo excluyendo
+la clase de test mencionada, ejecutamos:
+
+````bash
+mvnw test -Dgroups="!integration_test_webtestclient"
+````
+
+**NOTA**
+> No he investigado por qué ocurre este error en consola, pero supongo que es porque la clase está usando el archivo
+> **import.sql** para hacer los test, pero también tenemos otras clases test que usan el mismo archivo, eso provoca que
+> las afirmaciones no sean correctas, ya que los datos son modificados por varias clases.
+>
+> Aunque, si ejecutamos todos los test desde el **IDE IntelliJ IDEA** no ocurre el mismo problema, allí sí se ejecutan
+> todos los test exitosamente.
+
+## Solución al error de caracteres especiales en consola
+
+Puede que al ejecutar el test mediante consola nos salgan errores producto de la codificación de caracteres, tal como se
+ve en la siguiente imagen:
+
+![error-caracteres-consola.png](./assets/error-caracteres-consola.png)
+
+Entonces, para solucionar esto, debemos cambiar el tipo de codificación de caractereres, **solo de los archivos que usen
+los caracteres especiales, ya que ellos son los que provocan este error**, como el **import.sql y el
+test-account-data.sql** ubicados en **/test/resources**.
+
+![scripts-con-caracteres-especiales.png](./assets/scripts-con-caracteres-especiales.png)
+
+Si nuestros test usan el archivo **import.sql** del **/main/resources/** y este también contiene caracteres especiales,
+por consiguiente también deberíamos hacer lo mismo:
+
+Para cambiar el tipo de codificación hacemos lo siguiente:
+
+- Seleccionamos el archivo a cambiar la codificación, por ejemplo **import.sql** luego vamos a
+  ``File/File Properties/File Encoding``
+- Seleccionamos **ISO-8859-1** y clic en **Convert**
+- Para comprobar que se realizó el cambio, abrimos el archivo **import.sql** y observamos en la parte inferior el tipo
+  de codificación del archivo, tal como se ve en la siguiente imagen:
+
+  ![cambio-caracteres.png](./assets/cambio-caracteres.png)
+
+Listo, ahora ejecutamos los test nuevamente y todo debería funcionar correctamente:
+
+![test-running-successfully.png](./assets/test-running-successfully.png)
+
+**IMPORTANTE**
+
+> Si vamos a volver a realizar los test desde el **IDE IntelliJ IDEA**, debemos convertir los archivos a sus caracteres
+> originales **(UTF-8)** sino las pruebas ejecutadas con el IDE fallarán.

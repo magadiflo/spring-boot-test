@@ -6,10 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.magadiflo.app.models.Account;
 import com.magadiflo.app.models.dto.TransactionDTO;
 import org.hamcrest.Matchers;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -23,6 +20,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag(value = "integration_test_webtestclient")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AccountControllerWebTestClientIntegrationTest {
