@@ -2568,3 +2568,35 @@ class AccountControllerTestRestTemplateIntegrationTest {
 > Esta forma de utilizar la ruta completa (absoluta) también aplica para la sección donde vimos la realización de
 > Pruebas de Integración con WebTestClient.
 
+## Prueba de Integración con TestRestTemplate: para el detalle
+
+````java
+
+@Sql(scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerTestRestTemplateIntegrationTest {
+    @Autowired
+    private TestRestTemplate client;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @LocalServerPort
+    private int port;
+
+    @Test
+    void should_find_an_account() {
+        ResponseEntity<Account> response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts/1"), Account.class);
+        Account account = response.getBody();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertNotNull(account);
+        assertEquals(1L, account.getId());
+        assertEquals("Andrés", account.getPerson());
+        assertEquals(1000D, account.getBalance().doubleValue());
+    }
+
+    private String createAbsolutePath(String uri) {
+        return String.format("http://localhost:%d%s", this.port, uri);
+    }
+}
+````

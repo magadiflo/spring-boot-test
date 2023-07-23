@@ -3,6 +3,7 @@ package com.magadiflo.app.integrationTest.controllers;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.magadiflo.app.models.Account;
 import com.magadiflo.app.models.dto.TransactionDTO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,19 @@ class AccountControllerTestRestTemplateIntegrationTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
         assertEquals("transferencia exitosa", jsonNode.get("message").asText());
+    }
+
+    @Test
+    void should_find_an_account() {
+        ResponseEntity<Account> response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts/1"), Account.class);
+        Account account = response.getBody();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertNotNull(account);
+        assertEquals(1L, account.getId());
+        assertEquals("Andrés", account.getPerson());
+        assertEquals(1000D, account.getBalance().doubleValue());
     }
 
     private String createAbsolutePath(String uri) {
