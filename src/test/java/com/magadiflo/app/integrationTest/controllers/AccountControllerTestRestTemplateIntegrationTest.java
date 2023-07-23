@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import org.springframework.test.context.jdbc.Sql;
 
 
 import java.math.BigDecimal;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -88,6 +90,42 @@ class AccountControllerTestRestTemplateIntegrationTest {
         assertEquals(5L, accountDB.getId());
         assertEquals("Nophy", accountDB.getPerson());
         assertEquals(4000D, accountDB.getBalance().doubleValue());
+    }
+
+    @Test
+    void should_delete_an_account() {
+        ResponseEntity<Account[]> response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts"), Account[].class);
+        Account[] accountsDB = response.getBody();
+        assertNotNull(accountsDB);
+        assertEquals(4, accountsDB.length);
+
+        this.client.delete(this.createAbsolutePath("/api/v1/accounts/{id}"), Collections.singletonMap("id", 1));
+
+        response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts"), Account[].class);
+        accountsDB = response.getBody();
+        assertNotNull(accountsDB);
+        assertEquals(3, accountsDB.length);
+        ResponseEntity<Account> resp = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts/1"), Account.class);
+        assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
+    }
+
+    @Test
+    void should_delete_an_account_with_exchange() {
+        ResponseEntity<Account[]> response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts"), Account[].class);
+        Account[] accountsDB = response.getBody();
+        assertNotNull(accountsDB);
+        assertEquals(4, accountsDB.length);
+
+        ResponseEntity<Void> responseExchange = this.client.exchange(this.createAbsolutePath("/api/v1/accounts/{id}"),
+                HttpMethod.DELETE, null, Void.class, Collections.singletonMap("id", 1));
+
+        assertEquals(HttpStatus.NO_CONTENT, responseExchange.getStatusCode());
+        assertFalse(responseExchange.hasBody());
+
+        response = this.client.getForEntity(this.createAbsolutePath("/api/v1/accounts"), Account[].class);
+        accountsDB = response.getBody();
+        assertNotNull(accountsDB);
+        assertEquals(3, accountsDB.length);
     }
 
     private String createAbsolutePath(String uri) {
