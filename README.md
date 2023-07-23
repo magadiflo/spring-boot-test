@@ -2639,3 +2639,33 @@ class AccountControllerTestRestTemplateIntegrationTest {
     }
 }
 ````
+
+## Prueba de Integración con TestRestTemplate: para el guardar
+
+````java
+
+@Sql(scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountControllerTestRestTemplateIntegrationTest {
+    @Autowired
+    private TestRestTemplate client;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @LocalServerPort
+    private int port;
+
+    @Test
+    void should_save_an_account() {
+        Account accountToSave = new Account(null, "Nophy", new BigDecimal("4000"));
+        ResponseEntity<Account> response = this.client.postForEntity(this.createAbsolutePath("/api/v1/accounts"), accountToSave, Account.class);
+        Account accountDB = response.getBody();
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertNotNull(accountDB);
+        assertEquals(5L, accountDB.getId());
+        assertEquals("Nophy", accountDB.getPerson());
+        assertEquals(4000D, accountDB.getBalance().doubleValue());
+    }
+}
+````

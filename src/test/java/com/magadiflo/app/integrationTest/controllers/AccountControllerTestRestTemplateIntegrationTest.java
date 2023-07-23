@@ -76,6 +76,20 @@ class AccountControllerTestRestTemplateIntegrationTest {
         assertEquals(1000D, jsonNode.get(0).path("balance").asDouble());
     }
 
+    @Test
+    void should_save_an_account() {
+        Account accountToSave = new Account(null, "Nophy", new BigDecimal("4000"));
+        ResponseEntity<Account> response = this.client.postForEntity(this.createAbsolutePath("/api/v1/accounts"), accountToSave, Account.class);
+        Account accountDB = response.getBody();
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertNotNull(accountDB);
+        assertEquals(5L, accountDB.getId());
+        assertEquals("Nophy", accountDB.getPerson());
+        assertEquals(4000D, accountDB.getBalance().doubleValue());
+    }
+
     private String createAbsolutePath(String uri) {
         return String.format("http://localhost:%d%s", this.port, uri);
     }
