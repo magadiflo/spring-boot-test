@@ -2811,3 +2811,158 @@ Listo, ahora ejecutamos los test nuevamente y todo debería funcionar correctame
 
 > Si vamos a volver a realizar los test desde el **IDE IntelliJ IDEA**, debemos convertir los archivos a sus caracteres
 > originales **(UTF-8)** sino las pruebas ejecutadas con el IDE fallarán.
+>
+
+---
+
+# Pruebas de Integración a nuestro controller usando MockMvc
+
+En secciones anteriores realizamos **Pruebas Unitarias** a nuestro controlador **AccountController** utilizando
+**MockMvc**. Decíamos que esta clase se puede **utilizar para invocar al controlador simulando la llamada HTTP sin tener
+que arrancar realmente ningún servidor web**, es decir simulábamos el **request y response**. Además, nos apoyábamos de
+la anotación **@MockBean** para simular la dependencia **IAccountService** que requiere este controlador y a través del
+uso de **Mockito** simulamos la respuesta que nos debería retornar cuando algún método de esta dependencia fuese
+llamada.
+
+Pues bien, en esta sección volveremos a usar **MockMvc** para poder realizar solicitudes **HTTP** al controlador
+**AccountController**, pero en esta oportunidad realizaremos **Pruebas de Integración**, es decir, se ejecutará nuestro
+código desde la primera capa donde se expone nuestros datos (end points), hasta la última capa donde se recogen los
+datos o manipulan los datos obtenidos de la Base de Datos. Para que esto funcione es necesario utilizar algunas
+anotaciones **distintas al que usamos en la realización de pruebas unitarias**.
+
+A continuación se mostrarán las anotaciones más relevantes:
+
+### @SpringBootTest
+
+En secciones superiores explicábamos el uso de esta anotación, pero solo para recordar decíamos que **Spring Boot
+proporciona esta anotación (@SpringBootTest) para realizar pruebas de integración. Esta anotación crea un contexto
+de aplicación y carga el contexto completo de la aplicación.**
+
+### webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
+
+Esta propiedad corresponde a la anotación **@SpringBootTest()**, y decíamos que selecciona un puerto aleatorio para el
+servidor web durante la prueba.
+
+### @AutoConfigureMockMvc
+
+Anotación que se puede aplicar a una clase de prueba para habilitar y **configurar la configuración automática de
+MockMvc.**
+
+### MockMvc
+
+En secciones anteriores decíamos que **MockMvc ofrece una interfaz para realizar solicitudes HTTP (GET, POST, PUT,
+DELETE, etc.) a los endpoints de nuestros controladores y obtener las respuestas simuladas**. Ahora, en este caso
+ya no obtendremos respuestas simuladas, sino respuestas reales con datos reales, pues las llamadas HTTP se realizarán
+a nuestro servidor de pruebas que se crea gracias a la anotación **@SpringBootTest**.
+
+Finalmente, nuestra clase de prueba de integración utilizando MockMvc quedaría de la siguiente manera:
+
+````java
+
+@Sql(scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureMockMvc
+class AccountControllerMockMvcIntegrationTest {
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @LocalServerPort
+    private int port;
+
+    @Test
+    void should_find_all_accounts() throws Exception {
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.get(this.createAbsolutePath("/api/v1/accounts")));
+
+        response.andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.size()", Matchers.is(4)))
+                .andExpect(MockMvcResultMatchers.jsonPath("$", Matchers.hasSize(4)))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[0].person").value("Andrés"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[1].person").value("Pedro"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[2].person").value("Liz"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$[3].person").value("Karen"));
+    }
+
+    @Test
+    void should_find_an_account() throws Exception {
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.get(this.createAbsolutePath("/api/v1/accounts/{id}"), 1));
+        response.andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id").value(1))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.person").value("Andrés"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.balance").value(1000));
+    }
+
+    @Test
+    void should_return_empty_when_account_does_not_exist() throws Exception {
+        // Given
+        Long accountId = 10L;
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.get("/api/v1/accounts/{id}", accountId));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isNotFound());
+    }
+
+    @Test
+    void should_transfer_an_amount_between_accounts() throws Exception {
+        // Given
+        TransactionDTO dto = new TransactionDTO(1L, 1L, 2L, new BigDecimal("1000"));
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/accounts/transfer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(this.objectMapper.writeValueAsString(dto)));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.code").value(HttpStatus.OK.value()))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.datetime").exists())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.message").value("transferencia exitosa"))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.transaction.accountIdOrigin").value(dto.accountIdOrigin()));
+
+        String jsonResponse = response.andReturn().getResponse().getContentAsString();
+        JsonNode jsonNode = this.objectMapper.readTree(jsonResponse);
+
+        String dateTime = jsonNode.get("datetime").asText();
+        LocalDateTime localDateTime = LocalDateTime.parse(dateTime);
+
+        assertEquals(LocalDate.now(), localDateTime.toLocalDate());
+    }
+
+    @Test
+    void should_save_an_account() throws Exception {
+        // Given
+        Long idDB = 5L;
+        Account account = new Account(null, "Martín", new BigDecimal("2000"));
+
+        // When
+        ResultActions response = this.mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/accounts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(this.objectMapper.writeValueAsString(account)));
+
+        // Then
+        response.andExpect(MockMvcResultMatchers.status().isCreated())
+                .andExpect(MockMvcResultMatchers.content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.header().string("Location", "/api/v1/accounts/" + idDB))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.id", Matchers.is(idDB.intValue())))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.person", Matchers.is("Martín")))
+                .andExpect(MockMvcResultMatchers.jsonPath("$.balance", Matchers.is(2000)));
+    }
+
+    @Test
+    void should_delete_an_account() throws Exception {
+        ResultActions responseDelete = this.mockMvc.perform(MockMvcRequestBuilders.delete(this.createAbsolutePath("/api/v1/accounts/{id}"), 1));
+        responseDelete.andExpect(MockMvcResultMatchers.status().isNoContent());
+
+        ResultActions responseGet = this.mockMvc.perform(MockMvcRequestBuilders.get(this.createAbsolutePath("/api/v1/accounts/{id}"), 1));
+        responseGet.andExpect(MockMvcResultMatchers.status().isNotFound());
+    }
+
+    private String createAbsolutePath(String uri) {
+        return String.format("http://localhost:%d%s", this.port, uri);
+    }
+}
+````
