@@ -7,6 +7,7 @@ import com.magadiflo.app.models.Bank;
 import com.magadiflo.app.repositories.IAccountRepository;
 import com.magadiflo.app.repositories.IBankRepository;
 import com.magadiflo.app.services.IAccountService;
+import com.magadiflo.app.services.impl.AccountServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,7 +19,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@SpringBootTest
+@SpringBootTest(classes = AccountServiceImpl.class)
 class AccountServiceImplWithSpringBootAnnotationsUnitTest {
     @MockBean
     IAccountRepository accountRepository;
