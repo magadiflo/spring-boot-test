@@ -547,7 +547,7 @@ serán las anotaciones que usaremos:
 
 ````java
 
-@SpringBootTest
+@SpringBootTest(classes = AccountServiceImpl.class)
 class AccountServiceImplWithSpringBootAnnotationsUnitTest {
     @MockBean
     IAccountRepository accountRepository;
@@ -567,12 +567,34 @@ class AccountServiceImplWithSpringBootAnnotationsUnitTest {
 }
 ````
 
-Anteriormente, ya habíamos explicado el uso de la anotación **@SpringBootTest**, donde decíamos que Spring Boot
-proporciona esta anotación para las **pruebas de integración**. Esta anotación crea un contexto para la aplicación y
-carga el contexto completo de la aplicación.
+Anteriormente, ya habíamos explicado el uso de la anotación `@SpringBootTest`, donde decíamos que Spring Boot
+proporciona esta anotación para las `pruebas de integración`. Esta anotación crea un contexto para la aplicación y
+**carga el contexto completo de la aplicación.**
 
-En este caso lo utilizaremos para realizar **pruebas unitarias**, pero más adelante determinaremos que lo mejor para
-realizar pruebas unitarias a servicios y/o componentes será **hacer uso del Mockito.mock() o la anotación @Mock.**
+En ese sentido, para evitar que `@SpringBootTest` nos cargue todo el contexto completo de la aplicación, es que vamos
+a delimitar la ejecución de esta clase de test al uso de la clase `AccountServiceImpl.class`, en otras palabras
+cuando usamos la siguiente línea `@SpringBootTest(classes = AccountServiceImpl.class)` le estamos diciendo a Spring
+Boot que solo debe cargar la clase `AccountServiceImpl.class` durante la prueba.
+
+Si usas la anotación `@SpringBootTest` sin ningún otro valor como parámetro, **Spring Boot intentará cargar toda la
+configuración de tu aplicación durante la prueba. Esto incluirá la configuración de los componentes de tu aplicación,
+como controladores, servicios, repositorios, y cualquier otra configuración que esté presente en tu proyecto.**
+
+En muchos casos, esto no es un problema y puede simplificar la escritura de pruebas, ya que no necesitas especificar
+qué clases cargar explícitamente. Sin embargo, cargar toda la configuración puede hacer que las pruebas sean más lentas
+y complejas, especialmente si tienes una aplicación grande con muchas dependencias.
+
+Por otro lado, especificar la clase con la anotación `@SpringBootTest(classes = AccountServiceImpl.class)` limita la
+carga de la configuración solo a la clase especificada y las clases que esta clase utiliza directa o indirectamente.
+Esto puede hacer que las pruebas sean más rápidas y más enfocadas, ya que solo se carga lo necesario para la clase que
+estás probando.
+
+Por lo tanto, en esta clase de test usaremos la configuración `@SpringBootTest(classes = AccountServiceImpl.class)`,
+dado que estamos realizando `pruebas unitarias` a la clase de servicio `AccountServiceImpl` y no requerimos que se
+nos cargue todo un contexto de la aplicación.
+
+Más adelante determinaremos que lo mejor para realizar `pruebas unitarias` a servicios y/o componentes será
+**hacer uso del `Mockito.mock()` o la anotación `@Mock`.**
 
 **@MockBean**
 
