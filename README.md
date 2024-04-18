@@ -2465,7 +2465,7 @@ recursos de ruta:
 scripts = {"/test-account-cleanup.sql", "/test-account-data.sql"}
 ````
 
-En nuestro caso, definiremos dos scripts sql, el primero hará un truncate de toda la tabla **accounts**, pero según
+En nuestro caso, definiremos dos scripts sql, el primero hará un truncate a cada una de las dos tablas, pero según
 revisé, ese truncate no reinicia el contador de incremento de los ids, así que por eso se hace uso de un ALTER TABLE
 para reiniciar la columna id a 1.
 
@@ -2475,6 +2475,9 @@ cada método de prueba individual.**
 ````
 # test-account-cleanup.sql
 #
+TRUNCATE TABLE banks;
+ALTER TABLE banks ALTER COLUMN id RESTART WITH 1;
+
 TRUNCATE TABLE accounts;
 ALTER TABLE accounts ALTER COLUMN id RESTART WITH 1;
 ````
